@@ -1,0 +1,39 @@
+:root {
+  --color-primary: #7A1F0A;
+  --color-primary-dk: #5E1707;
+  --color-cream: #F3E8D9;
+  --color-accent: #C9A66C;
+  --color-accent-lt: #E7D3A6;
+  --color-nav: #D8B98A;
+  --color-hero-sub: #8B6A3F;
+
+  --color-bg: #faf6f0;
+  --color-text: #2a1c14;
+  --color-muted: #7a6a5c;
+  --color-card-bg: #ffffff;
+  --color-card-border: #e7ddd0;
+
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body: 'Nunito Sans', sans-serif;
+
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { margin: 0; min-height: 100%; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+/* Header seals: 100px on desktop, scale down on small screens */
+.seal { width: 100px; height: 100px; object-fit: contain; flex-shrink: 0; }
+@media (max-width: 600px) {
+  .seal { width: 56px; height: 56px; }
+}
