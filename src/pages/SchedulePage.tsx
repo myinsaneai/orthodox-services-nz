@@ -13,26 +13,7 @@ import {
 } from '../lib/firestore';
 import type { Parish, Group, Service } from '../lib/firestore';
 import { DEFAULT_PARISH_ACCENT } from '../themes/tokens';
-
-const NZ_TZ = 'Pacific/Auckland';
-
-function todayNZ(): string {
-  // en-CA formats as YYYY-MM-DD
-  return new Intl.DateTimeFormat('en-CA', { timeZone: NZ_TZ }).format(new Date());
-}
-
-function formatWhen(s: Service, lang: 'en' | 'el'): string {
-  const [y, m, d] = s.date.split('-').map(Number);
-  const [hh, mm] = s.time.split(':').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d, hh, mm));
-  const day = new Intl.DateTimeFormat(lang === 'el' ? 'el-GR' : 'en-NZ', {
-    weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC',
-  }).format(dt);
-  const time = new Intl.DateTimeFormat(lang === 'el' ? 'el-GR' : 'en-NZ', {
-    hour: 'numeric', minute: '2-digit', timeZone: 'UTC',
-  }).format(dt);
-  return `${day} · ${time}`;
-}
+import { todayNZ, formatWhen, resolveScope, scopeKey, visibleServices } from '../lib/schedule';
 
 const chip = (active: boolean): React.CSSProperties => ({
   fontSize: 12, padding: '4px 10px', borderRadius: 14, cursor: 'pointer',
@@ -49,12 +30,15 @@ export default function SchedulePage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
+  // Until the parish list has arrived, a ?parish= / ?group= slug cannot be
+  // resolved, so show "Loading…" instead of a false "No upcoming services".
+  const [parishesLoaded, setParishesLoaded] = useState(false);
 
   const groupSlug = params.get('group');
   const parishSlug = params.get('parish');
 
   useEffect(() => {
-    const u1 = subscribeParishes(setParishes);
+    const u1 = subscribeParishes(p => { setParishes(p); setParishesLoaded(true); });
     const u2 = subscribeGroups(setGroups);
     return () => { u1(); u2(); };
   }, []);
@@ -66,24 +50,19 @@ export default function SchedulePage() {
   );
 
   // Resolve the URL selection to a Firestore scope.
-  const scope: 'all' | string[] | null = useMemo(() => {
-    if (parishSlug) {
-      const p = visibleParishes.find(x => x.slug === parishSlug);
-      return p ? [p.id] : null;
-    }
-    if (groupSlug) {
-      const g = groups.find(x => x.slug === groupSlug);
-      if (!g) return null;
-      const ids = visibleParishes.filter(p => p.groupIds.includes(g.id)).map(p => p.id);
-      return ids.length ? ids : null;
-    }
-    return 'all';
-  }, [parishSlug, groupSlug, visibleParishes, groups]);
-
-  const scopeKey = scope === 'all' ? 'all' : scope?.join(',') ?? 'none';
+  const scope = useMemo(
+    () => resolveScope({ parishSlug, groupSlug }, parishes, groups),
+    [parishSlug, groupSlug, parishes, groups],
+  );
+  const key = scopeKey(scope);
+  const unresolved = scope === null && !parishesLoaded;
 
   useEffect(() => {
-    if (scope === null) { setServices([]); setLoadingServices(false); return; }
+    if (scope === null) {
+      setServices([]);
+      setLoadingServices(unresolved);
+      return;
+    }
     setLoadingServices(true);
     const unsub = subscribeUpcomingServices(scope, todayNZ(), s => {
       setServices(s);
@@ -91,7 +70,9 @@ export default function SchedulePage() {
     });
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeKey]);
+  }, [key, unresolved]);
+
+  const shown = useMemo(() => visibleServices(services, parishes), [services, parishes]);
 
   const select = (next: Record<string, string>) => setParams(next, { replace: true });
 
@@ -139,11 +120,11 @@ export default function SchedulePage() {
 
         {loadingServices ? (
           <p style={{ color: 'var(--color-muted)' }}>{t('loading', lang)}</p>
-        ) : services.length === 0 ? (
+        ) : shown.length === 0 ? (
           <p style={{ color: 'var(--color-muted)' }}>{t('noServices', lang)}</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {services.map(s => {
+            {shown.map(s => {
               const parish = parishById[s.parishId];
               const parishName = parish ? (lang === 'el' ? parish.nameEl : parish.nameEn) : '';
               const title = lang === 'el' ? s.titleEl || s.titleEn : s.titleEn;
