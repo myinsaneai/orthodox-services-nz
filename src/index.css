@@ -37,3 +37,57 @@ a { color: inherit; }
 @media (max-width: 600px) {
   .seal { width: 56px; height: 56px; }
 }
+
+/* ── Layout ───────────────────────────────────────────────────────────────────
+   Small screens: everything centred, content in a narrow column.
+   From 900px up: the header is left-aligned as one group (seal, title and
+   menu, seal), page headings and content start at the left page edge
+   (--gutter), and the content uses the full browser width (cards fill it in
+   as many columns as fit). */
+:root { --gutter: 20px; }
+
+.site-header {
+  background: var(--color-primary);
+  padding: 10px var(--gutter);
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.site-header__text { text-align: center; }
+.site-title {
+  font-family: var(--font-display); font-weight: 600; font-size: 19px;
+  color: var(--color-accent-lt); letter-spacing: 0.5px;
+}
+.site-nav {
+  display: flex; align-items: center; justify-content: center; gap: 18px;
+  margin-top: 6px; font-size: 12px;
+}
+
+.hero { background: var(--color-cream); padding: 20px var(--gutter) 18px; text-align: center; }
+.hero h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 26px;
+  color: var(--color-accent);
+}
+.hero-sub { font-size: 13px; color: var(--color-hero-sub); margin-top: 4px; }
+
+.page { max-width: 700px; margin: 0 auto; padding: 16px var(--gutter) 40px; }
+
+.cards-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--card-min, 340px)), 1fr));
+}
+.cards-grid--parishes { --card-min: 280px; gap: 12px; }
+
+@media (min-width: 900px) {
+  :root { --gutter: 40px; }
+
+  .site-header { justify-content: flex-start; gap: 24px; padding-top: 12px; padding-bottom: 12px; }
+  .site-header__text { text-align: left; }            /* no flex-grow: the second seal stays next to the title */
+  .site-title { font-size: 28px; }
+  .site-nav { justify-content: flex-start; gap: 28px; font-size: 14px; margin-top: 8px; }
+
+  .hero { text-align: left; padding-top: 24px; padding-bottom: 22px; }
+  .hero h1 { font-size: 34px; }
+  .hero-sub { font-size: 14px; }
+
+  .page { max-width: none; margin: 0; }
+  .page--text { max-width: 75ch; }                    /* running text keeps a readable line length */
+}

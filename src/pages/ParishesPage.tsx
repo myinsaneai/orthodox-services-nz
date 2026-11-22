@@ -17,19 +17,11 @@ export default function ParishesPage() {
 
   return (
     <>
-      <div style={{ background: 'var(--color-cream)', padding: '20px 24px 18px', textAlign: 'center' }}>
-        <h1 style={{
-          margin: 0, fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 26,
-          color: 'var(--color-accent)',
-        }}>
-          {t('parishesHeading', lang)}
-        </h1>
+      <div className="hero">
+        <h1>{t('parishesHeading', lang)}</h1>
       </div>
 
-      <div style={{
-        maxWidth: 700, margin: '0 auto', padding: '16px 20px 40px',
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12,
-      }}>
+      <div className="page cards-grid cards-grid--parishes">
         {parishes.filter(p => p.visible).map(p => (
           <Link
             key={p.id} to={`/services?parish=${encodeURIComponent(p.slug)}`}

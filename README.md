@@ -50,6 +50,8 @@ This extends the Russian parish site's single `admins/{uid}` + `sections` patter
 ### Header and navigation
 - The two seals flank the site title (Ecumenical Patriarchate on the left, Holy Metropolis of New Zealand on the right; the Metropolis seal now also covers Fiji, Tonga and Samoa). Shown at 100 px, 56 px on phones.
 - Navigation is exactly **Services**, **Parishes**, **About**, plus the language switch.
+- **Small screens (under 900 px):** header, menu and headings centred, content in a 700 px column.
+- **Large screens (900 px and up):** the header is left-aligned as one group (left seal, title and menu, second seal right after the title), page headings and content start at the left page edge, and the content uses the full browser width. Services and parishes are card grids that add columns as the window widens (1 column on a phone, 2 at about 1100 px, 4 at 1600 px, 7 at 2560 px). Running text (About) stays at a readable line length.
 
 ### Branding
 - One unified design for every parish, with a small per-parish accent: a coloured bar on each service card and a dot in the directory (`accentColor`).
@@ -75,7 +77,7 @@ Design phase is finished: four directions were mocked up and **Option A, "Cathed
 
 Fonts: Cormorant Garamond (headings), Nunito Sans (body and menu), loaded from Google Fonts. Tokens are in `src/themes/tokens.ts` and as CSS variables in `src/index.css`.
 
-Screens: **Services** (hero band, filter chips, service cards), **Parishes** (grid of parish cards, each linking to that parish's schedule), **About** (placeholder), **Admin** (sign-in, dashboard placeholder).
+Screens: **Services** (hero band, filter chips, grid of service cards), **Parishes** (grid of parish cards, each linking to that parish's schedule), **About** (placeholder), **Admin** (sign-in, dashboard placeholder).
 
 The Option A prototype is on a private Claude page that only the author can open: https://claude.ai/artifact/EjUVe3aM9kHMUW8WnZevQK. The code is now the design reference.
 
@@ -94,6 +96,7 @@ src/
   lib/          firebase, firebaseAdmin, firestore (types + helpers), schedule, i18n
   pages/        SchedulePage, ParishesPage, AboutPage
   themes/       tokens.ts
+  index.css     CSS variables, responsive layout classes (.site-header, .hero, .page, .cards-grid)
   assets/seals/ the two seal images
 tests/          Vitest tests (see Testing)
 ```
@@ -128,11 +131,12 @@ Security rules (`firestore.rules`): everything is publicly readable except `admi
 8. **Launch and handover.** First superadmin, onboarding of parish admins.
 
 ### Testing
-- `npm test` (Vitest 5 + jsdom + Testing Library): 79 tests in 8 files. Firebase is always faked; no test touches the network or an emulator.
+- `npm test` (Vitest 5 + jsdom + Testing Library): 90 tests in 9 files. Firebase is always faked; no test touches the network or an emulator.
 - `tests/schedule.test.ts`: NZ date around daylight-saving changes, English/Greek date text, scope resolution, hidden parishes.
 - `tests/i18n.test.ts`: every string has real English and Greek text; the three agreed menu items.
 - `tests/rules.test.ts`: **static** checks of `firestore.rules` and `firestore.indexes.json` against the code (every collection has a rule, no open writes, writes tied to the parish, the indexes the queries need). They read the files; they do not run the rules.
-- `tests/layout.test.tsx`, `schedule-page.test.tsx`, `parishes-page.test.tsx`: header, language switching and persistence, the three scopes, loading state, Greek text.
+- `tests/layout.test.tsx`, `schedule-page.test.tsx`, `parishes-page.test.tsx`: header, language switching and persistence, the three scopes, loading state, Greek text, the layout classes the CSS relies on.
+- `tests/layout-css.test.ts`: **static** checks of `src/index.css` for the small/large screen behaviour (left-aligned menu and headings, no width cap on large screens). jsdom does not apply media queries, so this is not a visual test; check real widths in a browser.
 - `tests/authguard.test.tsx`, `tests/app.test.tsx`: routing, the lazy admin area with a faked sign-in, who may edit which parish.
 - Tests use fixed timestamps, never the current time. When you add a field or a collection, update the types, the rules, the README data model and the tests together.
 

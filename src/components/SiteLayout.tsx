@@ -22,22 +22,11 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{
-        background: 'var(--color-primary)', padding: '10px 20px',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-      }}>
+      <header className="site-header">
         <img className="seal" src={sealLeft} alt="Ecumenical Patriarchate" />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 19,
-            color: 'var(--color-accent-lt)', letterSpacing: 0.5,
-          }}>
-            {t('siteTitle', lang)}
-          </div>
-          <nav aria-label="Main navigation" style={{
-            display: 'flex', gap: 18, justifyContent: 'center', alignItems: 'center',
-            marginTop: 6, fontSize: 12,
-          }}>
+        <div className="site-header__text">
+          <div className="site-title">{t('siteTitle', lang)}</div>
+          <nav aria-label="Main navigation" className="site-nav">
             {NAV.map(item => (
               <NavLink
                 key={item.to}

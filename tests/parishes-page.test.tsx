@@ -38,6 +38,11 @@ describe('Parishes page', () => {
     expect(screen.getByRole('link', { name: /Holy Trinity/ }).getAttribute('href')).toBe('/services?parish=holy-trinity');
     expect(screen.getByRole('link', { name: /St Nectarios/ }).getAttribute('href')).toBe('/services?parish=st%20nect%261');
   });
+  it('uses the hero and full-width card grid classes', () => {
+    const { container } = mount();
+    expect(container.querySelector('.hero h1')?.textContent).toBe('Parishes');
+    expect(container.querySelector('.page.cards-grid')).toBeTruthy();
+  });
   it('shows Greek names in Greek', () => {
     localStorage.setItem('gp_lang', 'el');
     mount();

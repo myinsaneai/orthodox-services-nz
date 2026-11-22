@@ -78,19 +78,12 @@ export default function SchedulePage() {
 
   return (
     <>
-      <div style={{ background: 'var(--color-cream)', padding: '20px 24px 18px', textAlign: 'center' }}>
-        <h1 style={{
-          margin: 0, fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 26,
-          color: 'var(--color-accent)',
-        }}>
-          {t('servicesHeading', lang)}
-        </h1>
-        <div style={{ fontSize: 13, color: 'var(--color-hero-sub)', marginTop: 4 }}>
-          {t('servicesSub', lang)}
-        </div>
+      <div className="hero">
+        <h1>{t('servicesHeading', lang)}</h1>
+        <div className="hero-sub">{t('servicesSub', lang)}</div>
       </div>
 
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '16px 20px 40px' }}>
+      <div className="page">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
           <button type="button" style={chip(!groupSlug && !parishSlug)} onClick={() => select({})}>
             {t('allParishes', lang)}
@@ -123,7 +116,7 @@ export default function SchedulePage() {
         ) : shown.length === 0 ? (
           <p style={{ color: 'var(--color-muted)' }}>{t('noServices', lang)}</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="cards-grid">
             {shown.map(s => {
               const parish = parishById[s.parishId];
               const parishName = parish ? (lang === 'el' ? parish.nameEl : parish.nameEn) : '';

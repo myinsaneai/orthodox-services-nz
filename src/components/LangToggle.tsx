@@ -13,7 +13,7 @@ export default function LangToggle() {
       aria-label={lang === 'en' ? 'Switch to Greek' : 'Switch to English'}
       style={{
         background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-        fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--color-nav)',
+        fontFamily: 'var(--font-body)', fontSize: 'inherit', color: 'var(--color-nav)',
         display: 'flex', gap: 4,
       }}
     >

@@ -23,7 +23,7 @@ Read this file and `README.md` first. The README holds the requirements, data mo
 ## 3. Stack
 - Frontend: React 19, TypeScript 7, Vite 8, React Router 7, Firebase web SDK 13, plain CSS variables plus inline styles. No UI library.
 - Lint: `oxlint` (what the Vite template ships), not ESLint. It reports two `only-export-components` warnings for the context files (a provider and its hook in one file); accepted, same pattern as the Russian parish site.
-- Tests: Vitest 5 + jsdom + Testing Library (`npm test` = `vitest run tests`). **79 tests in 8 files**, all passing. `tests/` is not part of `tsc -b` (the tsconfig includes `src` only), so test files are not type-checked; Vitest still transforms them.
+- Tests: Vitest 5 + jsdom + Testing Library (`npm test` = `vitest run tests`). **90 tests in 9 files**, all passing. `tests/` is not part of `tsc -b` (the tsconfig includes `src` only), so test files are not type-checked; Vitest still transforms them.
 - `npm audit`: 0 vulnerabilities. The root `package.json` has an `overrides` entry pinning `@grpc/grpc-js` to `^1.14.0` (Firestore pulled in a vulnerable 1.13.x; same fix as in `fishing-league`). Do not use `npm audit fix --force`: it proposes downgrading `firebase` to 9.x.
 - No Cloud Functions, no emulator, no Storage uploads yet.
 - Env: `.env.local` holds `VITE_FIREBASE_*` (see `.env.example`). Anything `VITE_` is public.
@@ -36,6 +36,7 @@ Read this file and `README.md` first. The README holds the requirements, data mo
 - `lib/`: `firebase.ts` (app + Firestore only), `firebaseAdmin.ts` (Auth + Storage; admin code only), `firestore.ts` (types and all reads/writes), `schedule.ts` (pure helpers: `todayNZ`, `formatWhen`, `resolveScope`, `scopeKey`, `visibleServices`), `i18n.ts` (fixed UI strings, EN/EL).
 - `pages/`: `SchedulePage.tsx`, `ParishesPage.tsx`, `AboutPage.tsx` (placeholder).
 - `admin/`: `AdminApp.tsx` (routes: `login`, index = dashboard), `LoginPage.tsx`, `AdminDashboard.tsx` (placeholder).
+- `index.css` holds the layout classes (`.site-header`, `.site-nav`, `.hero`, `.page`, `.cards-grid`) and the 900 px breakpoint; pages use these classes, not inline layout styles.
 - `themes/tokens.ts` (design tokens, default parish accent), `assets/seals/` (the two seal PNGs, 232 px source), `hooks/` (empty).
 
 Root: `firestore.rules`, `firestore.indexes.json`, `storage.rules`, `firebase.json`, `.firebaserc`, `.env.example`, `tests/`, `README.md`, this file.
@@ -50,6 +51,7 @@ Not built: any admin editor (parishes, groups, services, users), recurring servi
 ## 6. Decisions already made
 - **Design:** Option A. Options B (directory-first, light header), C (ornamented, stripe divider) and D (true meander divider) were mocked up and not used; do not bring them back without being asked. Header seals are 100 px (56 px on phones), taken from a 232 px source for sharpness.
 - **Menu:** exactly Services, Parishes, About plus the language switch. A test enforces the three items.
+- **Responsive layout:** under 900 px everything is centred in a 700 px column. From 900 px the header is left-aligned as one group (seal, title and menu, seal; the title block does not grow, so the second seal stays next to the title and is not pushed to the right edge), headings and content start at the left page edge and use the full width; services and parishes are auto-fill card grids (minimum card width 340 px, parishes 280 px). The title/menu therefore start after the left seal (about 164 px in) while headings start at the page edge (40 px); changing that is a one-line CSS decision. Layout lives in CSS classes because inline styles cannot do media queries.
 - **One design for all parishes**, with only a small per-parish accent (`accentColor`: the coloured bar on a service card and the dot in the directory). No per-parish themes, no theme switcher (unlike the Russian site's `themes/`).
 - **Roles:** `superadmin` (`parishIds: 'all'`) and `parish-admin` (`parishIds` list). A parish admin edits services of listed parishes only. Parishes, groups, settings and admin records are superadmin-only. A `parish-admin` record with `parishIds: 'all'` is treated as able to edit nothing (tested) rather than as a superadmin.
 - **Times are New Zealand wall-clock strings** (`date` `YYYY-MM-DD`, `time` `HH:mm`) shown as written; "today" is the NZ date (`todayNZ`). There is no time-zone conversion anywhere, so daylight saving cannot shift a service. Do not switch to Firestore Timestamps without a reason.
@@ -81,7 +83,7 @@ Not built: any admin editor (parishes, groups, services, users), recurring servi
 - Anything against a real Firebase project: reading parishes/groups/services, the two composite indexes, Auth sign-in, the `admins/{uid}` role lookup, the lazy admin chunk loading in production.
 - **Firestore and Storage rules** are checked only by reading and by `tests/rules.test.ts` (static). No emulator has ever been run.
 - **Offline or failing Firestore:** with a bogus project the Services page showed "No upcoming services found." within a second, which would also be what a visitor with no connection sees. There is no error or offline state yet (`onSnapshot` has no error callback and `snap.metadata.fromCache` is ignored). Treat "no services" as unreliable until this is handled.
-- Real phones and real data: layout was only checked with an empty list; service cards were checked in tests (markup, accent colour, Greek text), not in a browser.
+- Real phones and real data: the wide-screen layout was measured in a headless browser at 390, 1100, 1600 and 2560 px, and the card grid was checked with hand-written sample markup using the built CSS (1, 2, 4 and 7 columns), not with live data from Firestore through the React page. Not tried on a real phone or on very long titles.
 - Greek wording of the UI strings was written by the assistant and has not been reviewed by a Greek speaker.
 
 ## 9. Open questions

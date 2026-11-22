@@ -44,6 +44,14 @@ describe('header', () => {
     expect(within(nav).getByText('Parishes').getAttribute('aria-current')).toBe('page');
     expect(within(nav).getByText('Services').getAttribute('aria-current')).toBeNull();
   });
+  it('uses the layout classes that the responsive CSS targets', () => {
+    mount();
+    const header = screen.getByRole('banner');
+    expect(header.className).toBe('site-header');
+    expect(header.querySelector('.site-title')?.textContent).toBe('Greek Orthodox Parishes of New Zealand');
+    expect(screen.getByRole('navigation', { name: 'Main navigation' }).className).toBe('site-nav');
+    expect(header.querySelectorAll('img.seal')).toHaveLength(2);
+  });
   it('renders the page content', () => {
     mount();
     expect(screen.getByText('page body')).toBeTruthy();

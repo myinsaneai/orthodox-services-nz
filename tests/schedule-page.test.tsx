@@ -140,6 +140,15 @@ describe('loading', () => {
   });
 });
 
+describe('layout hooks', () => {
+  it('heading in the hero band, services in the card grid', () => {
+    const { container } = mount();
+    expect(container.querySelector('.hero h1')?.textContent).toBe('Services & Sacred Mysteries');
+    expect(container.querySelector('.hero-sub')).toBeTruthy();
+    expect(container.querySelectorAll('.page > .cards-grid > div')).toHaveLength(3);   // 3 visible parishes' services
+  });
+});
+
 describe('details', () => {
   it('uses each parish\'s accent colour on its card', () => {
     mount();
