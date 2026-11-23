@@ -117,6 +117,25 @@ describe('admin area', () => {
   });
 });
 
+describe('header hint written by the admin area', () => {
+  it('is on for an admin, and off after sign-out or for a person without a record', async () => {
+    h.admin = { uid: 'u1', email: 'admin@example.com', role: 'superadmin', parishIds: 'all' };
+    mountApp('/admin');
+    await waitFor(() => expect(h.cb).not.toBeNull());
+    await signIn(fbUser);
+    expect(localStorage.getItem('gp_admin')).toBe('1');
+    await signIn(null);
+    expect(localStorage.getItem('gp_admin')).toBeNull();
+    h.admin = null;
+    await signIn(fbUser);
+    expect(localStorage.getItem('gp_admin')).toBeNull();
+  });
+  it('public pages show "Log in" for a visitor', async () => {
+    mountApp('/services');
+    expect(await screen.findByRole('link', { name: 'Log in' })).toBeTruthy();
+  });
+});
+
 describe('who may edit which parish (AuthContext.canEditParish)', () => {
   function Probe() {
     const { canEditParish, role } = useAuth();

@@ -2,13 +2,13 @@
 
 Read this file and `README.md` first. The README holds the requirements, data model and phase plan. This file holds everything else: decisions, how we work, how the code is laid out, traps already hit, and what is next. The repo is the source of truth, so clone it instead of asking for files to be pasted.
 
-## 1. Snapshot (as of commit `baf1037` "Alignment changed", 23 November 2026)
+## 1. Snapshot (base commit `ca319a3`, 23 November 2026; the Log in / Log out + Google sign-in change is described below and is not committed until the developer pushes it)
 **Current focus: Firebase setup** (section 10a is the checklist for it).
 - **What:** website with the service schedules of the parishes of the Greek Orthodox Church in New Zealand and Oceania. Views: one parish, a named group of parishes, all parishes. English and Greek, mobile-friendly. Roles: visitor, parish admin, superadmin.
 - **Repo:** https://github.com/myinsaneai/orthodox-services-nz. Local path on the developer's machine: `C:\React\orthodox-schedule-nz` (Windows, PowerShell). The folder name differs from the repo name; that does not matter to git.
-- **Firebase project:** **not created yet.** `.firebaserc` holds the placeholder `REPLACE-WITH-FIREBASE-PROJECT-ID`; `.env.local` does not exist. Nothing has been deployed, so there is no live site.
+- **Firebase project:** `orthodox-services-nz` (project number 228434230790), created 23 November 2026 with a web app, Firestore (**`australia-southeast2`, Melbourne**), Storage (bucket `orthodox-services-nz.firebasestorage.app`, not used yet), Hosting, and Authentication with Email/Password and Google enabled. `.firebaserc` has the project id; `.env.local` is filled in on the developer's PC. Firestore rules and the two indexes are deployed. First superadmin exists (`admins/{uid}`, email sign-in works locally). **Hosting is not deployed yet**; no demo or real data has been entered.
 - **People:** the developer is Alexei. He chose the design himself after reviewing four mock-ups.
-- **Live status:** nothing is live. Verified so far (on a fresh clone of `baf1037`): 90 tests in 9 files pass, production build passes, `npm audit` 0 vulnerabilities, no secrets tracked; the public pages were looked at in a headless browser at 390, 1100, 1600 and 2560 px in English and Greek **with no data** (empty Firestore).
+- **Live status:** nothing is on the public internet yet. Verified live against the real project: `npm run dev` starts, rules and indexes deploy, email sign-in at `/admin/login` shows the superadmin. Verified so far (on a fresh clone of `baf1037`): 90 tests in 9 files pass, production build passes, `npm audit` 0 vulnerabilities, no secrets tracked; the public pages were looked at in a headless browser at 390, 1100, 1600 and 2560 px in English and Greek **with no data** (empty Firestore).
 - **Design:** Option A "Cathedral Classic": maroon `#7A1F0A` header with the two seals flanking the title, cream `#F3E8D9` hero band, gold `#C9A66C` accents, Cormorant Garamond + Nunito Sans. The Option A prototype is on a private Claude page only the developer can open: https://claude.ai/artifact/EjUVe3aM9kHMUW8WnZevQK. The code is now the design reference.
 
 ## 2. How we work (please keep doing this)
@@ -24,7 +24,7 @@ Read this file and `README.md` first. The README holds the requirements, data mo
 ## 3. Stack
 - Frontend: React 19, TypeScript 7, Vite 8, React Router 7, Firebase web SDK 13, plain CSS variables plus inline styles. No UI library.
 - Lint: `oxlint` (what the Vite template ships), not ESLint. It reports two `only-export-components` warnings for the context files (a provider and its hook in one file); accepted, same pattern as the Russian parish site.
-- Tests: Vitest 5 + jsdom + Testing Library (`npm test` = `vitest run tests`). **90 tests in 9 files**, all passing. `tests/` is not part of `tsc -b` (the tsconfig includes `src` only), so test files are not type-checked; Vitest still transforms them.
+- Tests: Vitest 5 + jsdom + Testing Library (`npm test` = `vitest run tests`). **111 tests in 11 files**, all passing. `tests/` is not part of `tsc -b` (the tsconfig includes `src` only), so test files are not type-checked; Vitest still transforms them.
 - `npm audit`: 0 vulnerabilities. The root `package.json` has an `overrides` entry pinning `@grpc/grpc-js` to `^1.14.0` (Firestore pulled in a vulnerable 1.13.x; same fix as in `fishing-league`). Do not use `npm audit fix --force`: it proposes downgrading `firebase` to 9.x.
 - No Cloud Functions, no emulator, no Storage uploads yet.
 - Env: `.env.local` holds `VITE_FIREBASE_*` (see `.env.example`). Anything `VITE_` is public.
@@ -59,12 +59,14 @@ Not built: any admin editor (parishes, groups, services, users), recurring servi
 - **Bilingual content** is stored as paired fields (`...En`, `...El`). In Greek, a missing `titleEl` or `notesEl` falls back to the English text; names are not optional in either language.
 - **Visibility:** a parish with `visible: false` is not listed, not selectable, and none of its services show, even in the "all parishes" view (filtered in the browser by `visibleServices`, because the query cannot filter on another document). A group or parish slug that does not resolve shows "no services", never everything.
 - **Public / admin split** (same idea as the Russian site): Auth and Storage live only in `firebaseAdmin.ts`, reached only through the lazy admin chunk. A test checks that public pages do not start the auth listener.
-- **No public sign-up.** Admin accounts are created by hand in the Firebase console and given a role by a superadmin.
+- **No public sign-up page, but Google sign-in can create an Auth user for any Google account.** That account has no rights: everything depends on an `admins/{uid}` document, which only a superadmin creates, and the login page tells such a person "this account has not been given admin access yet". Workflow for a new admin: they sign in once with Google (or the superadmin adds them in the console), the UID appears in Authentication → Users, the superadmin creates `admins/{uid}`.
+- **Log in / Log out in the header** (`SiteLayout.tsx`, `AccountControl`) sits next to the menu but **outside the `<nav>`**, so the menu stays exactly Services, Parishes, About + language (a test enforces it). Public code must not load `firebase/auth`, so the header shows "Log out" from a one-bit **hint** in `localStorage` (`gp_admin`, `src/lib/authHint.ts`) written by `AuthContext` after the role lookup; "Log out" loads `src/admin/signOut.ts` by dynamic import only when clicked. The hint is display only, never a permission.
+- **Google sign-in = Google Identity Services + `signInWithCredential`** (`src/admin/googleSignIn.ts`), copied in design from `fishing-league`; Firebase's popup is the fallback when `VITE_GOOGLE_CLIENT_ID` is not set or Google's script has not loaded. Built-in browsers (Messenger/Facebook blocked, Telegram/Viber/etc. hinted) are detected in `src/admin/embeddedBrowser.ts`. Do not move to `signInWithRedirect`.
 - **Order of services** comes from the query (`date`, then `time`), not from the browser.
 
 ## 7. Traps already hit (do not repeat)
 - **Never define a component inside another component** (inputs lose focus on every keystroke): use module-level components.
-- **Never import `firebaseAdmin.ts` or `AuthContext` from public code.** It would pull `firebase/auth` into every visitor's bundle.
+- **Never import `firebaseAdmin.ts` or `AuthContext` from public code** (a dynamic `import('../admin/signOut')` on click is the one allowed route; it builds to its own tiny chunk). It would pull `firebase/auth` into every visitor's bundle.
 - Adding a field to a parish, group or service means touching **five places**: the type in `lib/firestore.ts`, the editor form (when it exists), `firestore.rules` (when it validates fields), the README data model, and the tests.
 - **Firestore's `in` operator takes at most 30 values.** `subscribeUpcomingServices` takes the first 30 parish ids of a group and drops the rest silently. Fine for a country this size; if a group could exceed 30, split into several queries.
 - **The Firestore location is permanent** once the database is created. Decide it before clicking Create.
@@ -78,10 +80,11 @@ Not built: any admin editor (parishes, groups, services, users), recurring servi
 - A static check of `firestore.rules` is not a rules test. Do not claim the rules are verified until emulator tests exist.
 
 ## 8. Verified live and not verified live
-**Confirmed working live:** nothing (no Firebase project yet).
+**Confirmed working live (developer, 23 Nov 2026):** the Firebase project, `.env.local` values, rules and indexes deployed, creating the first superadmin, email/password sign-in on `localhost` showing `superadmin`.
 
-**Not yet confirmed (all of it):**
-- Anything against a real Firebase project: reading parishes/groups/services, the two composite indexes, Auth sign-in, the `admins/{uid}` role lookup, the lazy admin chunk loading in production.
+**Not yet confirmed:**
+- **Google sign-in (both the Identity Services path and the popup fallback), the Log in / Log out button, the "no admin access" notice, Hosting deploy, and everything on a real domain.** The code is covered by tests with Firebase and Google faked, and the header was looked at in a headless browser at 390 and 1100 px.
+- Reading parishes/groups/services from the real project (no data yet), the two composite indexes actually serving a query, the lazy admin chunk loading in production.
 - **Firestore and Storage rules** are checked only by reading and by `tests/rules.test.ts` (static). No emulator has ever been run.
 - **Offline or failing Firestore:** with a bogus project the Services page showed "No upcoming services found." within a second, which would also be what a visitor with no connection sees. There is no error or offline state yet (`onSnapshot` has no error callback and `snap.metadata.fromCache` is ignored). Treat "no services" as unreliable until this is handled.
 - Real phones and real data: the wide-screen layout was measured in a headless browser at 390, 1100, 1600 and 2560 px, and the card grid was checked with hand-written sample markup using the built CSS (1, 2, 4 and 7 columns), not with live data from Firestore through the React page. Not tried on a real phone or on very long titles.
@@ -92,12 +95,14 @@ See README "Open decisions": Firestore location, recurring services, what a grou
 
 ## 9a. Outside the repository (check these in a new thread before debugging)
 - **GitHub:** `myinsaneai/orthodox-services-nz` (public) has three commits on `main`, all authored by the developer: scaffold, tests and handover, then the wide-screen layout (`baf1037`). The developer commits and pushes from `C:\React\orthodox-schedule-nz`.
-- **Firebase console (to do):** create the project and a web app; create Firestore (choose the location); enable Authentication → Email/Password; add Authorized domains; add the first user and the `admins/{uid}` document (README, "Firebase setup").
+- **Firebase console (done 23 Nov 2026):** project `orthodox-services-nz`, web app, Firestore in `australia-southeast2`, Storage, Hosting, Authentication (Email/Password and Google), first user and `admins/{uid}` superadmin document. Authorized domains should list `localhost`, `orthodox-services-nz.web.app` and `orthodox-services-nz.firebaseapp.com` (check after the first deploy).
+- **Google Cloud (to do for the Identity Services path):** APIs & Services → Credentials → "Web client (auto created by Google Service)": copy its client ID into `.env.local` as `VITE_GOOGLE_CLIENT_ID`, and list the site addresses under Authorized JavaScript origins. Until then the Google button uses Firebase's popup.
+- **When the dedicated domain arrives** (same recipe as `fishing-league`): (1) Hosting → add custom domain and the DNS records Firebase shows; (2) Authentication → Settings → Authorized domains: add the domain and `www`; (3) set `VITE_FIREBASE_AUTH_DOMAIN=<domain>` in `.env.local` and rebuild; (4) Google Cloud → the web client: add `https://<domain>` and `https://www.<domain>` to Authorized JavaScript origins, and `https://<domain>/__/auth/handler` plus the `www` version to Authorized redirect URIs (keep the `firebaseapp.com` one); (5) `npm run build`, `firebase deploy --only hosting`, test Google and email sign-in on the new domain and on a phone. A missing entry shows "unauthorized domain". Never buy web hosting at a registrar; DNS records only.
 - **Developer's machine (git-ignored):** `.env.local` with the `VITE_FIREBASE_*` values, and the project id in `.firebaserc`.
 - **Seals:** the two source images (Ecumenical Patriarchate, Holy Metropolis of New Zealand, the new version covering Fiji, Tonga and Samoa, 1970) are the client's files, kept in `src/assets/seals/`.
 
 ## 10. Next steps
-1. **Firebase setup** (section 10a): create the project, fill `.env.local` and `.firebaserc`, deploy rules and indexes, create the first superadmin, check it end to end with demo data, deploy to Hosting. Decide the Firestore location first.
+1. **Finish Firebase setup** (section 10a): deploy to Hosting, check Google sign-in and the header button on the live address and a phone, add `VITE_GOOGLE_CLIENT_ID`. Demo data by hand was set aside in favour of seed data or the admin editors (items 3 and 4).
 2. Error and offline states on the three Firestore-backed pages (no more false "no services"), with tests.
 3. Seed data: a script or a superadmin-only screen to load the real parishes, groups and starter services (needs the real list).
 4. Admin editors: parishes, groups, services (single entries first, then recurring templates with feast-day overrides), users (assigning `parishIds`). Each parish-scoped screen must respect `canEditParish`.

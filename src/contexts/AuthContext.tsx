@@ -8,6 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { getAdminRecord } from '../lib/firestore';
 import { auth } from '../lib/firebaseAdmin';
+import { setAdminHint } from '../lib/authHint';
 
 export type Role = 'superadmin' | 'parish-admin' | null;
 
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch { /* treated as not an admin */ }
       }
       setRole(nextRole);
+      setAdminHint(nextRole !== null);   // display hint for the public header
       setAllowedParishes(nextParishes);
       setLoading(false);
     });

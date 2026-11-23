@@ -61,6 +61,21 @@ a { color: inherit; }
   margin-top: 6px; font-size: 12px;
 }
 
+.site-menu {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  column-gap: 18px; row-gap: 6px; margin-top: 6px;
+}
+.site-menu .site-nav { margin-top: 0; }
+.site-account { display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.site-account__link { color: var(--color-nav); text-decoration: none; }
+.site-account__btn {
+  background: none; color: var(--color-nav); border: 1px solid var(--color-nav);
+  border-radius: 999px; padding: 2px 12px; font: inherit; line-height: 1.5;
+  text-decoration: none; cursor: pointer;
+}
+.site-account__btn:hover, .site-account__link:hover { color: var(--color-accent-lt); border-color: var(--color-accent-lt); }
+.site-account__btn:disabled { opacity: 0.6; cursor: default; }
+
 .hero { background: var(--color-cream); padding: 20px var(--gutter) 18px; text-align: center; }
 .hero h1 {
   margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 26px;
@@ -83,6 +98,8 @@ a { color: inherit; }
   .site-header__text { text-align: left; }            /* no flex-grow: the second seal stays next to the title */
   .site-title { font-size: 28px; }
   .site-nav { justify-content: flex-start; gap: 28px; font-size: 14px; margin-top: 8px; }
+  .site-menu { justify-content: flex-start; column-gap: 28px; margin-top: 8px; }
+  .site-account { font-size: 14px; }
 
   .hero { text-align: left; padding-top: 24px; padding-bottom: 22px; }
   .hero h1 { font-size: 34px; }

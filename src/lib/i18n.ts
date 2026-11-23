@@ -16,6 +16,9 @@ const strings = {
   parishesHeading: { en: 'Parishes', el: 'Ενορίες' },
   aboutHeading:    { en: 'About', el: 'Σχετικά' },
   loading:         { en: 'Loading…', el: 'Φόρτωση…' },
+  logIn:           { en: 'Log in', el: 'Σύνδεση' },
+  logOut:          { en: 'Log out', el: 'Αποσύνδεση' },
+  adminLink:       { en: 'Admin', el: 'Διαχείριση' },
 } as const;
 
 export type StringKey = keyof typeof strings;

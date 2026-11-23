@@ -2,7 +2,7 @@
 
 A website with the service schedules of the parishes of the Greek Orthodox Church in New Zealand (and Oceania). One central place to see the schedule of a single parish, of a named group of parishes, or of all parishes. English and Greek, mobile-friendly, hosted on Firebase.
 
-**Status:** scaffold. The public pages (Services, Parishes, About) read from Firestore, and the admin area has sign-in and a placeholder dashboard. Nothing has been deployed or run against a real Firebase project yet. See [Implementation plan](#implementation-plan) and `HANDOVER.md`.
+**Status:** scaffold. The public pages (Services, Parishes, About) read from Firestore, and the admin area has Google and email sign-in and a placeholder dashboard. The Firebase project exists and the rules and indexes are deployed; the site is not on Hosting yet. See [Implementation plan](#implementation-plan) and `HANDOVER.md`.
 
 Repo: https://github.com/myinsaneai/orthodox-services-nz. Organised like the author's other projects: the folder layout follows the Russian parish site (`axces2000/russian-church`), and the tests + `HANDOVER.md` working style follows `myinsaneai/fishing-league`.
 
@@ -33,7 +33,7 @@ Repo: https://github.com/myinsaneai/orthodox-services-nz. Organised like the aut
 | **Parish admin** | Everything a visitor can, plus create, edit and delete services **for the parishes listed on their admin record** (`parishIds`). |
 | **Superadmin** | Everything, plus manage parishes, groups, site settings and the admin records themselves (`parishIds: 'all'`). |
 
-This extends the Russian parish site's single `admins/{uid}` + `sections` pattern: the delegated scope is now a list of **parishes** instead of a list of sections. Sign-in is email + password (Firebase Auth); there is no public sign-up, accounts are created by hand in the Firebase console and given a role by a superadmin.
+This extends the Russian parish site's single `admins/{uid}` + `sections` pattern: the delegated scope is now a list of **parishes** instead of a list of sections. Sign-in is Google or email + password (Firebase Auth). There is no sign-up page; a Google sign-in can create an Auth user for any Google account, but that account has no rights until a superadmin creates its `admins/{uid}` record. The header has a Log in / Log out button next to the menu.
 
 ## Requirements
 
@@ -131,13 +131,14 @@ Security rules (`firestore.rules`): everything is publicly readable except `admi
 8. **Launch and handover.** First superadmin, onboarding of parish admins.
 
 ### Testing
-- `npm test` (Vitest 5 + jsdom + Testing Library): 90 tests in 9 files. Firebase is always faked; no test touches the network or an emulator.
+- `npm test` (Vitest 5 + jsdom + Testing Library): 111 tests in 11 files. Firebase is always faked; no test touches the network or an emulator.
 - `tests/schedule.test.ts`: NZ date around daylight-saving changes, English/Greek date text, scope resolution, hidden parishes.
 - `tests/i18n.test.ts`: every string has real English and Greek text; the three agreed menu items.
 - `tests/rules.test.ts`: **static** checks of `firestore.rules` and `firestore.indexes.json` against the code (every collection has a rule, no open writes, writes tied to the parish, the indexes the queries need). They read the files; they do not run the rules.
 - `tests/layout.test.tsx`, `schedule-page.test.tsx`, `parishes-page.test.tsx`: header, language switching and persistence, the three scopes, loading state, Greek text, the layout classes the CSS relies on.
 - `tests/layout-css.test.ts`: **static** checks of `src/index.css` for the small/large screen behaviour (left-aligned menu and headings, no width cap on large screens). jsdom does not apply media queries, so this is not a visual test; check real widths in a browser.
 - `tests/authguard.test.tsx`, `tests/app.test.tsx`: routing, the lazy admin area with a faked sign-in, who may edit which parish.
+- `tests/account.test.tsx`, `tests/google-signin.test.tsx`: the header Log in / Log out button and its hint, the Google button (Identity Services path, popup fallback, cancel and error messages, in-app browsers), and the "no admin access" notice.
 - Tests use fixed timestamps, never the current time. When you add a field or a collection, update the types, the rules, the README data model and the tests together.
 
 ## Getting started
@@ -151,10 +152,13 @@ Security rules (`firestore.rules`): everything is publicly readable except `admi
 
 1. Create a Firebase project and a web app; copy the config values into `.env.local`.
 2. **Firestore:** create the database. **The location cannot be changed afterwards**; choose it deliberately ([Open decisions](#open-decisions)).
-3. **Authentication:** enable Email/Password. Add the site's domain under Authorized domains.
+3. **Authentication:** enable Email/Password and Google. Add the site's domain under Authorized domains.
 4. Deploy rules and indexes: `firebase deploy --only firestore:rules,firestore:indexes`.
 5. **First superadmin:** in the console add a user (email + password), copy the UID, then create `admins/{uid}` with `uid`, `email`, `role: superadmin`, `parishIds: all`. Sign in at `/admin/login`.
 6. Hosting: `npm run build`, then `firebase deploy --only hosting` (SPA rewrite to `index.html` is already in `firebase.json`).
+
+## Custom domain and Google sign-in
+Google sign-in uses Google Identity Services (`src/admin/googleSignIn.ts`) with Firebase's popup as fallback, as in the author's `fishing-league` project. Settings: `VITE_GOOGLE_CLIENT_ID` (public; the project's "Web client (auto created by Google Service)") and `VITE_FIREBASE_AUTH_DOMAIN`. When a dedicated domain is added: Hosting custom domain; Authorized domains (domain and `www`); `VITE_FIREBASE_AUTH_DOMAIN=<domain>`; in Google Cloud, the web client's Authorized JavaScript origins (`https://<domain>`, `https://www.<domain>`) and Authorized redirect URIs (`https://<domain>/__/auth/handler`, the `www` version, and the `firebaseapp.com` one); rebuild and deploy; test on a phone. Details in `HANDOVER.md` section 9a.
 
 ## Secrets and configuration
 - `.env.local` (git-ignored) holds the `VITE_FIREBASE_*` values. Anything starting with `VITE_` is public, so never put a real secret there. The Firebase web config is not secret; the rules are the protection.

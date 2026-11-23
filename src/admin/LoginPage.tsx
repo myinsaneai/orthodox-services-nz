@@ -1,11 +1,31 @@
 // src/admin/LoginPage.tsx
+// Admin sign-in: Google or email + password. Anyone can complete a Google
+// sign-in, but only a person with an admins/{uid} record gets into the admin
+// area (and the Firestore rules enforce the same), so a stranger who signs in
+// sees the "no admin access" notice below and can do nothing else.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebaseAdmin';
 import { useAuth } from '../contexts/AuthContext';
+import { signInWithGoogle, preloadGis, isGoogleCancel, googleErrorMessage } from './googleSignIn';
+import { embeddedBrowser } from './embeddedBrowser';
+
+const input: React.CSSProperties = {
+  width: '100%', padding: '9px 10px', marginBottom: 12, fontSize: 14,
+  border: '1px solid var(--color-card-border)', borderRadius: 4,
+};
+const primaryBtn: React.CSSProperties = {
+  width: '100%', padding: 10, border: 'none', borderRadius: 4, cursor: 'pointer',
+  background: 'var(--color-primary)', color: 'var(--color-cream)', fontSize: 14,
+};
+const googleBtn: React.CSSProperties = {
+  width: '100%', padding: 10, borderRadius: 4, cursor: 'pointer', fontSize: 14,
+  background: '#fff', color: 'var(--color-text)', border: '1px solid var(--color-card-border)',
+};
+const note: React.CSSProperties = { fontSize: 13, color: 'var(--color-muted)' };
 
 export default function LoginPage() {
   const { user, role, loading } = useAuth();
@@ -13,6 +33,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const kind = embeddedBrowser(typeof navigator === 'undefined' ? '' : navigator.userAgent);
+
+  // Fetch Google's script now, so the Google window can open straight from the tap.
+  useEffect(() => { preloadGis(); }, []);
 
   if (!loading && user && role) return <Navigate to="/admin" replace />;
 
@@ -29,29 +53,68 @@ export default function LoginPage() {
     }
   };
 
-  const input: React.CSSProperties = {
-    width: '100%', padding: '9px 10px', marginBottom: 12, fontSize: 14,
-    border: '1px solid var(--color-card-border)', borderRadius: 4,
+  const google = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      if (!isGoogleCancel(err)) setError(googleErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  return (
+  const shell = (children: React.ReactNode) => (
     <div style={{ maxWidth: 360, margin: '80px auto', padding: 24, fontFamily: 'var(--font-body)' }}>
       <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)', marginTop: 0 }}>
         Admin sign in
       </h1>
+      {children}
+    </div>
+  );
+
+  // Signed in, but no admins/{uid} record: explain instead of showing the form again.
+  if (!loading && user && !role) {
+    return shell(
+      <>
+        <p>
+          You are signed in as <strong>{user.email}</strong>, but this account has not been given
+          admin access yet. Ask a superadmin to add it.
+        </p>
+        <button type="button" style={googleBtn} onClick={() => signOut(auth)}>Sign out</button>
+      </>,
+    );
+  }
+
+  return shell(
+    <>
+      <button type="button" style={googleBtn} disabled={busy || kind === 'blocked'} onClick={google}>
+        Continue with Google
+      </button>
+      {kind === 'blocked' && (
+        <p style={note}>
+          Google sign-in does not work inside Messenger or Facebook. Use email and password, or open
+          this page in Safari or Chrome (menu → Open in browser).
+        </p>
+      )}
+      {kind === 'maybe' && (
+        <p style={note}>
+          This looks like the built-in browser of another app. If Google sign-in does not work here,
+          open this page in Chrome or Safari (menu → Open in browser), or use email and password.
+        </p>
+      )}
+      <p style={{ ...note, textAlign: 'center', margin: '14px 0' }}>or</p>
       <form onSubmit={submit}>
         <input style={input} type="email" placeholder="Email" value={email}
                onChange={e => setEmail(e.target.value)} autoComplete="username" required />
         <input style={input} type="password" placeholder="Password" value={password}
                onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
-        {error && <p style={{ color: '#a00', fontSize: 13 }}>{error}</p>}
-        <button type="submit" disabled={busy} style={{
-          width: '100%', padding: 10, border: 'none', borderRadius: 4, cursor: 'pointer',
-          background: 'var(--color-primary)', color: 'var(--color-cream)', fontSize: 14,
-        }}>
+        <button type="submit" disabled={busy} style={primaryBtn}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-    </div>
+      {error && <p role="alert" style={{ color: '#a00', fontSize: 13 }}>{error}</p>}
+    </>,
   );
 }
