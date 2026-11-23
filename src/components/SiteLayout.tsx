@@ -11,6 +11,7 @@ import LangToggle from './LangToggle';
 import { useRoleHint } from '../hooks/useRoleHint';
 import { setRoleHint } from '../lib/authHint';
 import { isAtLeast } from '../lib/roles';
+import type { RoleName } from '../lib/roles';
 import sealLeft from '../assets/seals/seal-left-ecumenical-patriarchate.png';
 import sealRight from '../assets/seals/seal-right-holy-metropolis-nz.png';
 
@@ -20,11 +21,12 @@ const NAV: { to: string; key: StringKey }[] = [
   { to: '/about',    key: 'navAbout' },
 ];
 
-// "My page" is in the menu for admins and superadmins (other roles get theirs later).
-// Inside it, a second line shows the My page sections; more are added here.
+// "My page" is in the menu for every signed-in person. Inside it, a second line shows the
+// sections that person's role may open (Profile first); more are added here.
 const MY_PAGE = { to: '/admin', key: 'navMyPage' as StringKey };
-const MY_PAGE_SECTIONS: { to: string; key: StringKey }[] = [
-  { to: '/admin/users', key: 'navUsers' },
+const MY_PAGE_SECTIONS: { to: string; key: StringKey; min: RoleName }[] = [
+  { to: '/admin/profile', key: 'navProfile', min: 'user' },
+  { to: '/admin/users',   key: 'navUsers',   min: 'admin' },
 ];
 
 // Log in / Log out sits next to the menu, outside the <nav>, so the menu stays
@@ -60,7 +62,8 @@ function AccountControl() {
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   const { lang } = useLang();
   const { pathname } = useLocation();
-  const hasMyPage = isAtLeast(useRoleHint(), 'admin');
+  const role = useRoleHint();
+  const hasMyPage = role !== null;
   const items = hasMyPage ? [...NAV, MY_PAGE] : NAV;
   const inMyPage = hasMyPage && (pathname === '/admin' || pathname.startsWith('/admin/'));
 
@@ -90,7 +93,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           </div>
           {inMyPage && (
             <nav aria-label="My page sections" className="site-subnav">
-              {MY_PAGE_SECTIONS.map(s => (
+              {MY_PAGE_SECTIONS.filter(s => isAtLeast(role, s.min)).map(s => (
                 <NavLink key={s.to} to={s.to} className="site-subnav__link">{t(s.key, lang)}</NavLink>
               ))}
             </nav>

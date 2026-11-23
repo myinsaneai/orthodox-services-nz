@@ -2,10 +2,16 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Locked down until a feature needs uploads.
-    match /{allPaths=**} {
-      allow read: if true;
-      allow write: if false;
+    // Profile photos live at avatars/<uid>/<file>. A person manages only their own folder;
+    // the app always uploads a JPEG of at most 1024 px (well under 3 MB). Other signed-in
+    // people can list and read (the profile stores a download link, which works anyway).
+    match /avatars/{uid}/{file} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+                            && request.resource.size < 3 * 1024 * 1024
+                            && request.resource.contentType == 'image/jpeg';
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
+    // Nothing else is stored here.
   }
 }

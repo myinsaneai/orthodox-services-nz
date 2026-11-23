@@ -17,6 +17,7 @@ import type { Unsubscribe } from 'firebase/firestore';
 import { db } from './firebase';
 import { isRole } from './roles';
 import { signInMethods } from './signIn';
+import { safePhotoUrl } from './photoUrl';
 import type { SignInMethod } from './signIn';
 import type { RoleName } from './roles';
 
@@ -70,6 +71,7 @@ export interface UserProfile {
   photoURL: string;
   role: RoleName;
   parishIds: string[];     // parishes a coordinator may edit; empty for every other role
+  profileEdited: boolean;  // true once the person has set their own name or photo: Google's no longer overwrites them
   providers: SignInMethod[]; // how the person signs in; empty when not known yet (older profiles)
   createdAt: unknown;      // Firestore Timestamp
   lastSignInAt: unknown;   // Firestore Timestamp
@@ -163,6 +165,7 @@ const asProfile = (uid: string, d: Record<string, unknown>): UserProfile => ({
   photoURL: String(d.photoURL ?? ''),
   role: isRole(d.role) ? d.role : 'user',
   parishIds: Array.isArray(d.parishIds) ? (d.parishIds as string[]) : [],
+  profileEdited: d.profileEdited === true,
   providers: Array.isArray(d.providers) ? (d.providers as unknown[]).filter((m): m is SignInMethod => m === 'google' || m === 'password') : [],
   createdAt: d.createdAt ?? null,
   lastSignInAt: d.lastSignInAt ?? null,
@@ -180,19 +183,25 @@ export async function ensureUserProfile(
   },
 ): Promise<UserProfile> {
   const ref = doc(db, 'users', u.uid);
-  const fresh = { email: u.email ?? '', displayName: u.displayName ?? '', photoURL: u.photoURL ?? '' };
+  const fresh = { email: u.email ?? '', displayName: u.displayName ?? '', photoURL: safePhotoUrl(u.photoURL) };
   const providers = signInMethods(u.providerData);
   const snap = await getDoc(ref);
 
   if (snap.exists()) {
     const profile = asProfile(u.uid, snap.data());
+    // Once the person has set their own name or photo, the sign-in provider's no longer overwrite them.
+    const own = profile.profileEdited
+      ? { displayName: profile.displayName, photoURL: profile.photoURL }
+      : { displayName: fresh.displayName, photoURL: fresh.photoURL };
     const stale = Date.now() - toMillis(profile.lastSignInAt) > REFRESH_AFTER_MS;
-    const changed = profile.email !== fresh.email || profile.displayName !== fresh.displayName
-      || profile.photoURL !== fresh.photoURL || profile.providers.join() !== providers.join();
+    const changed = profile.email !== fresh.email || profile.displayName !== own.displayName
+      || profile.photoURL !== own.photoURL || profile.providers.join() !== providers.join();
     if (stale || changed) {
-      try { await updateDoc(ref, { ...fresh, providers, lastSignInAt: serverTimestamp() }); } catch { /* best effort */ }
+      try {
+        await updateDoc(ref, { email: fresh.email, ...own, providers, lastSignInAt: serverTimestamp() });
+      } catch { /* best effort */ }
     }
-    return { ...profile, ...fresh, providers };
+    return { ...profile, email: fresh.email, ...own, providers };
   }
 
   let legacy: AdminRecord | null = null;
@@ -209,6 +218,11 @@ export async function ensureUserProfile(
     throw err;
   }
   return asProfile(u.uid, { ...fresh, providers, role, createdAt: new Date(), lastSignInAt: new Date() });
+}
+
+/** The signed-in person edits their own name and photo (photoURL '' = no photo). */
+export async function updateOwnProfile(uid: string, p: { displayName: string; photoURL: string }) {
+  await updateDoc(doc(db, 'users', uid), { displayName: p.displayName, photoURL: p.photoURL, profileEdited: true });
 }
 
 export async function listUserProfiles(): Promise<UserProfile[]> {

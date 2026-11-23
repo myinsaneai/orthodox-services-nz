@@ -38,15 +38,19 @@ describe('AuthGuard', () => {
     mount();
     expect(screen.getByText('login page')).toBeTruthy();
   });
-  it('sends a plain user to the login page, which explains that there is no admin area', () => {
-    as('user');
-    mount();
-    expect(screen.getByText('login page')).toBeTruthy();
+  it('lets any signed-in role into a default page, plain users included', () => {
+    (['user', 'coordinator', 'admin', 'superadmin'] as RoleName[]).forEach(r => {
+      as(r);
+      mount();
+      expect(screen.getByText('secret')).toBeTruthy();
+      cleanup();
+    });
   });
-  it('lets a coordinator into a normal admin page', () => {
-    as('coordinator');
-    mount();
-    expect(screen.getByText('secret')).toBeTruthy();
+  it('keeps a plain user out of pages that need a coordinator', () => {
+    as('user');
+    mount('coordinator');
+    expect(screen.getByText('Access denied')).toBeTruthy();
+    expect(screen.queryByText('secret')).toBeNull();
   });
   it('keeps a coordinator out of admin-only pages', () => {
     as('coordinator');

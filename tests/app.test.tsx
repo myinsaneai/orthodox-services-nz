@@ -23,8 +23,11 @@ vi.mock('../src/lib/firestore', () => ({
   subscribeUpcomingServices: (_s: any, _f: any, cb: any) => { cb([]); return () => {}; },
   ensureUserProfile: async () => { if (h.fail) throw new Error('offline'); return h.profile; },
   listUserProfiles: async () => h.users,
+  updateOwnProfile: async () => {},
   setUserRole: async () => {}, deleteUserProfile: async () => {}, toMillis: () => 0,
 }));
+
+vi.mock('../src/admin/avatarStorage', () => ({ uploadAvatar: async () => 'https://firebasestorage.googleapis.com/x', removeAvatars: async () => {} }));
 
 import App from '../src/App';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
@@ -86,11 +89,11 @@ describe('admin area (My page)', () => {
     expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
     expect(window.location.pathname).toBe('/admin/login');
   });
-  it('a plain user who opens /admin ends up on the first page, not in an admin area', async () => {
+  it('a plain user who opens /admin lands on their Profile', async () => {
     await open('/admin', 'user');
-    expect(await screen.findByRole('heading', { name: 'Services', level: 1 })).toBeTruthy();
-    expect(window.location.pathname).toBe('/services');
-    expect(screen.queryByRole('heading', { name: 'My page' })).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Profile', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/admin/profile');
+    expect(screen.queryByRole('link', { name: 'Users' })).toBeNull();
   });
   it('after signing in on the sign-in page, everybody goes to the first page, not to My page', async () => {
     for (const role of ['user', 'coordinator', 'admin', 'superadmin']) {
@@ -101,37 +104,37 @@ describe('admin area (My page)', () => {
       expect(screen.queryByRole('heading', { name: 'My page' })).toBeNull();
     }
   });
-  it('a coordinator reaches My page and sees how many parishes they manage', async () => {
+  it('a coordinator reaches Profile, with no Users section', async () => {
     await open('/admin', 'coordinator', ['a', 'b']);
-    expect(await screen.findByRole('heading', { name: 'My page' })).toBeTruthy();
-    expect(screen.getByText(/admin@example\.com \(Coordinator, 2 parish\(es\)\)/)).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Users' })).toBeNull();      // no Users section for a coordinator
+    expect(await screen.findByRole('heading', { name: 'Profile', level: 1 })).toBeTruthy();
+    expect(screen.getByText('Coordinator')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Users' })).toBeNull();
   });
   it('a coordinator is kept out of the Users page', async () => {
     await open('/admin/users', 'coordinator', ['a']);
     expect(await screen.findByText('Access denied')).toBeTruthy();
   });
-  it('an admin sees "My page" in the menu and "Users" in a second line', async () => {
+  it('an admin sees "My page" in the menu, with Profile first and Users in a second line', async () => {
     await open('/admin', 'admin');
-    expect(await screen.findByRole('heading', { name: 'My page' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Profile', level: 1 })).toBeTruthy();
     const main = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(within(main).getByRole('link', { name: 'My page' }).getAttribute('href')).toBe('/admin');
     const sub = screen.getByRole('navigation', { name: 'My page sections' });
+    expect(within(sub).getAllByRole('link').map(a => a.textContent)).toEqual(['Profile', 'Users']);
     expect(within(sub).getByRole('link', { name: 'Users' }).getAttribute('href')).toBe('/admin/users');
-    expect(screen.getByText(/\(Admin\)/)).toBeTruthy();
   });
   it('the Users line opens the Users page for an admin', async () => {
     h.users = [{ ...profile('user'), uid: 'u2', email: 'maria@example.com', displayName: 'Maria' }];
     await open('/admin', 'admin');
-    await screen.findByRole('heading', { name: 'My page' });
+    await screen.findByRole('heading', { name: 'Profile', level: 1 });
     fireEvent.click(within(screen.getByRole('navigation', { name: 'My page sections' })).getByRole('link', { name: 'Users' }));
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeTruthy();
     expect(await screen.findByText('Maria')).toBeTruthy();
     expect(window.location.pathname).toBe('/admin/users');
   });
-  it('a superadmin reaches My page', async () => {
+  it('a superadmin reaches Profile', async () => {
     await open('/admin', 'superadmin');
-    expect(await screen.findByText(/\(SuperAdmin\)/)).toBeTruthy();
+    expect(await screen.findByText('SuperAdmin')).toBeTruthy();
   });
   it('a failed profile lookup is treated as "could not load", not as an admin', async () => {
     h.fail = true;
@@ -141,7 +144,7 @@ describe('admin area (My page)', () => {
   });
   it('"Log out" in the header returns to the sign-in form', async () => {
     await open('/admin', 'superadmin');
-    await screen.findByRole('heading', { name: 'My page' });
+    await screen.findByRole('heading', { name: 'Profile', level: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
     await waitFor(() => expect(h.signedOut).toBe(1));
     await signIn(null);                  // Firebase reports the sign-out

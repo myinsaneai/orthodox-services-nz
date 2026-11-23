@@ -21,11 +21,12 @@ interface AuthContextValue {
   role: Role;
   allowedParishes: string[] | 'all';
   loading: boolean;
+  applyProfile: (patch: Partial<UserProfile>) => void;   // after the person saved their own profile
   canEditParish: (parishId: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue>({
-  user: null, profile: null, role: null, allowedParishes: [], loading: true, canEditParish: () => false,
+  user: null, profile: null, role: null, allowedParishes: [], loading: true, applyProfile: () => {}, canEditParish: () => false,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -54,11 +55,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const allowedParishes: string[] | 'all' =
     isAtLeast(role, 'admin') ? 'all' : role === 'coordinator' ? profile!.parishIds : [];
 
+  const applyProfile = (patch: Partial<UserProfile>) => setProfile(p => (p ? { ...p, ...patch } : p));
+
   const canEditParish = (parishId: string) =>
     allowedParishes === 'all' || (Array.isArray(allowedParishes) && allowedParishes.includes(parishId));
 
   return (
-    <AuthContext.Provider value={{ user, profile, role, allowedParishes, loading, canEditParish }}>
+    <AuthContext.Provider value={{ user, profile, role, allowedParishes, loading, applyProfile, canEditParish }}>
       {children}
     </AuthContext.Provider>
   );

@@ -57,6 +57,14 @@ service cloud.firestore {
       return request.resource.data.get(field, '') is string &&
              request.resource.data.get(field, '').size() <= max;
     }
+    // A photo address must be empty, a Google account picture or our own Firebase Storage
+    // (the same pattern as src/lib/photoUrl.ts; a test keeps them identical).
+    function photoUrlOk() {
+      return request.resource.data.get('photoURL', '') is string &&
+             (request.resource.data.get('photoURL', '') == '' ||
+              request.resource.data.get('photoURL', '').matches(
+                'https://([a-z0-9-]+[.])+googleusercontent[.]com/.*|https://firebasestorage[.]googleapis[.]com/.*'));
+    }
     function emailOk() {
       return request.resource.data.email is string &&
              request.resource.data.email == request.auth.token.get('email', '');
@@ -76,7 +84,7 @@ service cloud.firestore {
                ['uid', 'email', 'displayName', 'photoURL', 'providers', 'role', 'parishIds', 'createdAt', 'lastSignInAt'])
           && request.resource.data.keys().hasAll(['uid', 'email', 'role', 'parishIds', 'createdAt', 'lastSignInAt'])
           && request.resource.data.uid == request.auth.uid
-          && emailOk() && textOk('displayName', 200) && textOk('photoURL', 2000) && providersOk()
+          && emailOk() && textOk('displayName', 200) && textOk('photoURL', 2000) && photoUrlOk() && providersOk()
           && request.resource.data.parishIds == []
           && request.resource.data.createdAt == request.time
           && request.resource.data.lastSignInAt == request.time
@@ -84,10 +92,13 @@ service cloud.firestore {
               (request.resource.data.role == 'superadmin' && legacySuper()));
     }
 
-    // A person may refresh their own name, photo, email and last-sign-in time, never their role.
+    // A person may edit their own name and photo and refresh email, sign-in method and last-sign-in
+    // time, never their role.
     function selfEditOk() {
-      return newKeys().hasOnly(['displayName', 'photoURL', 'email', 'providers', 'lastSignInAt'])
+      return newKeys().hasOnly(['displayName', 'photoURL', 'email', 'providers', 'profileEdited', 'lastSignInAt'])
           && textOk('displayName', 200) && textOk('photoURL', 2000) && providersOk()
+          && (!newKeys().hasAny(['photoURL']) || photoUrlOk())
+          && (!newKeys().hasAny(['profileEdited']) || request.resource.data.profileEdited == true)
           && (!newKeys().hasAny(['email']) || emailOk())
           && (!newKeys().hasAny(['lastSignInAt']) || request.resource.data.lastSignInAt == request.time);
     }

@@ -4,6 +4,7 @@
 // by reading the files. They do NOT prove the rules behave correctly.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { PHOTO_URL_PATTERN } from '../src/lib/photoUrl';
 
 const rules = readFileSync('firestore.rules', 'utf8');
 const code = readFileSync('src/lib/firestore.ts', 'utf8');
@@ -62,7 +63,7 @@ describe('firestore.rules', () => {
     expect(b).toMatch(/request\.auth\.uid == uid && selfEditOk\(\)/);
     expect(b).toMatch(/request\.auth\.uid != uid && roleChangeOk\(\)/);
     // the self-edit may touch these fields and nothing else
-    expect(rules).toMatch(/hasOnly\(\['displayName', 'photoURL', 'email', 'providers', 'lastSignInAt'\]\)/);
+    expect(rules).toMatch(/hasOnly\(\['displayName', 'photoURL', 'email', 'providers', 'profileEdited', 'lastSignInAt'\]\)/);
     // how a person signs in is limited to google / password
     expect(rules).toMatch(/hasOnly\(\['google', 'password'\]\)/);
     // a role change touches only role and parishIds
@@ -120,5 +121,34 @@ describe('firestore.indexes.json', () => {
   it('matches the queries in the code', () => {
     expect(code).toMatch(/where\('date', '>=', fromDate\), orderBy\('date'\), orderBy\('time'\)/);
     expect(code).toMatch(/where\('parishId', 'in', scope\.slice\(0, IN_LIMIT\)\)/);
+  });
+
+  it('photo addresses are limited to Google pictures and our Firebase Storage, on create and when changed', () => {
+    expect(rules).toContain(PHOTO_URL_PATTERN);               // the same pattern as src/lib/photoUrl.ts
+    expect(rules).toMatch(/&& photoUrlOk\(\) && providersOk\(\)\s*\n\s*&& request\.resource\.data\.parishIds == \[\]/);
+    expect(rules).toMatch(/!newKeys\(\)\.hasAny\(\['photoURL'\]\) \|\| photoUrlOk\(\)/);
+  });
+  it('profileEdited can only be set to true by the person themselves, never on create', () => {
+    expect(rules).toMatch(/!newKeys\(\)\.hasAny\(\['profileEdited'\]\) \|\| request\.resource\.data\.profileEdited == true/);
+    const create = rules.slice(rules.indexOf('function newProfileOk'), rules.indexOf('function selfEditOk'));
+    expect(create).not.toContain('profileEdited');
+  });
+});
+
+describe('storage.rules', () => {
+  const storage = readFileSync('storage.rules', 'utf8');
+  it('only avatars/<uid>/<file> is open for anything; everything else is denied by default', () => {
+    expect(storage).toMatch(/match \/avatars\/\{uid\}\/\{file\}/);
+    expect(storage).not.toMatch(/allPaths/);
+    expect(storage).not.toMatch(/if true/);
+  });
+  it('a person writes and deletes only in their own folder; uploads are a JPEG under 3 MB', () => {
+    expect(storage).toMatch(/allow create, update: if request\.auth != null && request\.auth\.uid == uid/);
+    expect(storage).toMatch(/request\.resource\.size < 3 \* 1024 \* 1024/);
+    expect(storage).toMatch(/request\.resource\.contentType == 'image\/jpeg'/);
+    expect(storage).toMatch(/allow delete: if request\.auth != null && request\.auth\.uid == uid/);
+  });
+  it('reading needs a signed-in person', () => {
+    expect(storage).toMatch(/allow read: if request\.auth != null/);
   });
 });

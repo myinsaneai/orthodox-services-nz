@@ -19,6 +19,7 @@ const strings = {
   logIn:           { en: 'Log in', el: 'Σύνδεση' },
   logOut:          { en: 'Log out', el: 'Αποσύνδεση' },
   navMyPage:       { en: 'My page', el: 'Η σελίδα μου' },
+  navProfile:      { en: 'Profile', el: 'Προφίλ' },
   navUsers:        { en: 'Users', el: 'Χρήστες' },
 } as const;
 

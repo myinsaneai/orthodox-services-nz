@@ -53,14 +53,11 @@ describe('header account control', () => {
       cleanup();
     });
   });
-  it('"My page" is in the menu only for admins and superadmins', () => {
-    (['user', 'coordinator'] as const).forEach(r => {
-      localStorage.clear(); setRoleHint(r);
-      mount();
-      expect(screen.queryByRole('link', { name: 'My page' })).toBeNull();
-      cleanup();
-    });
-    (['admin', 'superadmin'] as const).forEach(r => {
+  it('"My page" is in the menu for every signed-in role, and for nobody else', () => {
+    mount();
+    expect(screen.queryByRole('link', { name: 'My page' })).toBeNull();
+    cleanup();
+    (['user', 'coordinator', 'admin', 'superadmin'] as const).forEach(r => {
       localStorage.clear(); setRoleHint(r);
       mount();
       const nav = screen.getByRole('navigation', { name: 'Main navigation' });
@@ -69,18 +66,27 @@ describe('header account control', () => {
       cleanup();
     });
   });
-  it('the second line (Users) shows only inside My page', () => {
-    setRoleHint('admin');
-    mount();                                         // on /services
+  it('the second line shows only inside My page: Profile first, Users only for admins', () => {
+    const sections = (role: 'user' | 'coordinator' | 'admin' | 'superadmin') => {
+      localStorage.clear(); setRoleHint(role);
+      render(
+        <MemoryRouter initialEntries={['/admin/profile']}>
+          <LangProvider><SiteLayout><p>body</p></SiteLayout></LangProvider>
+        </MemoryRouter>,
+      );
+      const sub = screen.getByRole('navigation', { name: 'My page sections' });
+      const names = within(sub).getAllByRole('link').map(a => a.textContent);
+      cleanup();
+      return names;
+    };
+    expect(sections('user')).toEqual(['Profile']);
+    expect(sections('coordinator')).toEqual(['Profile']);
+    expect(sections('admin')).toEqual(['Profile', 'Users']);
+    expect(sections('superadmin')).toEqual(['Profile', 'Users']);
+
+    localStorage.clear(); setRoleHint('admin');
+    mount();                                         // on /services: no second line
     expect(screen.queryByRole('navigation', { name: 'My page sections' })).toBeNull();
-    cleanup();
-    render(
-      <MemoryRouter initialEntries={['/admin/users']}>
-        <LangProvider><SiteLayout><p>body</p></SiteLayout></LangProvider>
-      </MemoryRouter>,
-    );
-    const sub = screen.getByRole('navigation', { name: 'My page sections' });
-    expect(within(sub).getAllByRole('link').map(a => a.textContent)).toEqual(['Users']);
   });
   it('a stale hint, or one a person made up, shows nothing special', () => {
     localStorage.setItem('gp_admin', '1');           // the first version of the hint
