@@ -18,7 +18,8 @@ const strings = {
   loading:         { en: 'Loading…', el: 'Φόρτωση…' },
   logIn:           { en: 'Log in', el: 'Σύνδεση' },
   logOut:          { en: 'Log out', el: 'Αποσύνδεση' },
-  adminLink:       { en: 'Admin', el: 'Διαχείριση' },
+  navMyPage:       { en: 'My page', el: 'Η σελίδα μου' },
+  navUsers:        { en: 'Users', el: 'Χρήστες' },
 } as const;
 
 export type StringKey = keyof typeof strings;

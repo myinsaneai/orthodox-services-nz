@@ -1,31 +1,29 @@
 // src/admin/AdminDashboard.tsx
-// Placeholder dashboard. Parish / schedule / user editors arrive in the
-// admin back-end phase.
+// "My page" start page. Parish / schedule editors and requests arrive later;
+// each new section also gets a line in the second menu row (SiteLayout).
 
 import { Link } from 'react-router-dom';
-import { signOut } from 'firebase/auth';
-import { auth } from '../lib/firebaseAdmin';
 import { useAuth } from '../contexts/AuthContext';
+import { ROLE_LABEL, isAtLeast } from '../lib/roles';
 
 export default function AdminDashboard() {
   const { user, role, allowedParishes } = useAuth();
 
   return (
-    <div style={{ maxWidth: 700, margin: '40px auto', padding: 24, fontFamily: 'var(--font-body)' }}>
-      <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)', marginTop: 0 }}>
-        Admin dashboard
-      </h1>
-      <p style={{ color: 'var(--color-muted)' }}>
-        Signed in as {user?.email} ({role}
-        {role === 'parish-admin' && Array.isArray(allowedParishes) ? `, ${allowedParishes.length} parish(es)` : ''}).
-      </p>
-      <p style={{ color: 'var(--color-muted)' }}>Parish, schedule and user management coming soon.</p>
-      <p>
-        <Link to="/">← Public site</Link>{' · '}
-        <button type="button" onClick={() => signOut(auth)} style={{
-          background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0,
-        }}>Sign out</button>
-      </p>
-    </div>
+    <>
+      <div className="hero">
+        <h1>My page</h1>
+        <div className="hero-sub">
+          Signed in as {user?.email} ({role ? ROLE_LABEL[role] : ''}
+          {role === 'coordinator' && Array.isArray(allowedParishes) ? `, ${allowedParishes.length} parish(es)` : ''})
+        </div>
+      </div>
+      <div className="page page--text">
+        {isAtLeast(role, 'admin') && (
+          <p><Link to="/admin/users">Users</Link> — give people their roles.</p>
+        )}
+        <p className="um-muted">Schedule editing, requests and favourite parishes are coming soon.</p>
+      </div>
+    </>
   );
 }

@@ -9,14 +9,14 @@ vi.mock('../src/admin/signOut', () => ({
   adminSignOut: async () => {
     h.out();
     if (h.fail) throw new Error('offline');
-    const { setAdminHint } = await import('../src/lib/authHint');
-    setAdminHint(false);
+    const { setRoleHint } = await import('../src/lib/authHint');
+    setRoleHint(null);
   },
 }));
 
 import { LangProvider } from '../src/contexts/LangContext';
 import SiteLayout from '../src/components/SiteLayout';
-import { getAdminHint, setAdminHint } from '../src/lib/authHint';
+import { getRoleHint, setRoleHint } from '../src/lib/authHint';
 
 const mount = () => render(
   <MemoryRouter initialEntries={['/services']}>
@@ -44,24 +44,62 @@ describe('header account control', () => {
     expect(within(nav).getAllByRole('button')).toHaveLength(1);
     expect(within(nav).queryByText('Log in')).toBeNull();
   });
-  it('shows "Admin" and "Log out" when an admin is signed in', () => {
-    setAdminHint(true);
+  it('shows "Log out" instead of "Log in" for any signed-in role', () => {
+    (['user', 'coordinator', 'admin', 'superadmin'] as const).forEach(r => {
+      localStorage.clear(); setRoleHint(r);
+      mount();
+      expect(screen.getByRole('button', { name: 'Log out' })).toBeTruthy();
+      expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull();
+      cleanup();
+    });
+  });
+  it('"My page" is in the menu only for admins and superadmins', () => {
+    (['user', 'coordinator'] as const).forEach(r => {
+      localStorage.clear(); setRoleHint(r);
+      mount();
+      expect(screen.queryByRole('link', { name: 'My page' })).toBeNull();
+      cleanup();
+    });
+    (['admin', 'superadmin'] as const).forEach(r => {
+      localStorage.clear(); setRoleHint(r);
+      mount();
+      const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+      expect(within(nav).getByRole('link', { name: 'My page' }).getAttribute('href')).toBe('/admin');
+      expect(within(nav).getAllByRole('link')).toHaveLength(4);
+      cleanup();
+    });
+  });
+  it('the second line (Users) shows only inside My page', () => {
+    setRoleHint('admin');
+    mount();                                         // on /services
+    expect(screen.queryByRole('navigation', { name: 'My page sections' })).toBeNull();
+    cleanup();
+    render(
+      <MemoryRouter initialEntries={['/admin/users']}>
+        <LangProvider><SiteLayout><p>body</p></SiteLayout></LangProvider>
+      </MemoryRouter>,
+    );
+    const sub = screen.getByRole('navigation', { name: 'My page sections' });
+    expect(within(sub).getAllByRole('link').map(a => a.textContent)).toEqual(['Users']);
+  });
+  it('a stale hint, or one a person made up, shows nothing special', () => {
+    localStorage.setItem('gp_admin', '1');           // the first version of the hint
+    localStorage.setItem('gp_role', 'god');
     mount();
-    expect(screen.getByRole('link', { name: 'Admin' }).getAttribute('href')).toBe('/admin');
-    expect(screen.getByRole('button', { name: 'Log out' })).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Log in' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'My page' })).toBeNull();
   });
   it('"Log out" signs out and the header goes back to "Log in"', async () => {
-    setAdminHint(true);
+    setRoleHint('superadmin');
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
     expect(await screen.findByRole('link', { name: 'Log in' })).toBeTruthy();
     expect(h.out).toHaveBeenCalledTimes(1);
-    expect(getAdminHint()).toBe(false);
+    expect(getRoleHint()).toBeNull();
   });
   it('if sign-out cannot reach Firebase, the header still stops saying "Log out"', async () => {
     h.fail = true;
-    setAdminHint(true);
+    setRoleHint('superadmin');
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
     await waitFor(() => expect(screen.getByRole('link', { name: 'Log in' })).toBeTruthy());
@@ -71,16 +109,16 @@ describe('header account control', () => {
     mount();
     expect(screen.getByRole('link', { name: 'Σύνδεση' })).toBeTruthy();
     cleanup();
-    setAdminHint(true);
+    setRoleHint('admin');
     mount();
     expect(screen.getByRole('button', { name: 'Αποσύνδεση' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Διαχείριση' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Η σελίδα μου' })).toBeTruthy();
   });
   it('reacts when the hint changes in another tab', async () => {
     mount();
     expect(screen.getByRole('link', { name: 'Log in' })).toBeTruthy();
-    localStorage.setItem('gp_admin', '1');
-    window.dispatchEvent(new StorageEvent('storage', { key: 'gp_admin', newValue: '1' }));
+    localStorage.setItem('gp_role', 'user');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'gp_role', newValue: 'user' }));
     expect(await screen.findByRole('button', { name: 'Log out' })).toBeTruthy();
   });
 });

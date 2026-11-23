@@ -4,19 +4,35 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function isSignedIn() { return request.auth != null; }
-    function adminDoc() {
-      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+
+    // ── Roles ────────────────────────────────────────────────────────────────
+    // A person's role is users/{uid}.role: user, coordinator, admin or superadmin
+    // (the same table as src/lib/roles.ts). Until a person has a profile, the old
+    // admins/{uid} record of a superadmin still counts, so nobody is locked out
+    // while moving over; their profile is created at their next sign-in.
+    function myProfile() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasProfile() { return exists(myProfile()); }
+    function legacySuper() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'superadmin';
     }
-    function isAdmin() {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    function profileRoleIn(roles) {
+      return hasProfile() && get(myProfile()).data.role in roles;
     }
-    function isSuperAdmin() { return isAdmin() && adminDoc().role == 'superadmin'; }
-    // Parish-admin may edit only the parishes listed in their admins doc.
+    function isSuperAdmin() {
+      return isSignedIn() && (profileRoleIn(['superadmin']) || (!hasProfile() && legacySuper()));
+    }
+    function isAdminUp() {
+      return isSignedIn() && (profileRoleIn(['admin', 'superadmin']) || (!hasProfile() && legacySuper()));
+    }
+    function isCoordinator() { return isSignedIn() && profileRoleIn(['coordinator']); }
+
+    // Admins and superadmins may edit every parish; a coordinator only the parishes
+    // listed on their own profile.
     function canEditParish(parishId) {
-      return isSuperAdmin() ||
-        (isAdmin() && adminDoc().role == 'parish-admin' &&
-         adminDoc().parishIds is list && parishId in adminDoc().parishIds);
+      return isAdminUp() ||
+        (isCoordinator() && get(myProfile()).data.parishIds is list &&
+         parishId in get(myProfile()).data.parishIds);
     }
 
     // Public read; superadmin write (parish list, groups, site settings).
@@ -27,16 +43,77 @@ service cloud.firestore {
     // Services: public read; write only for the parish the service belongs to.
     match /services/{id} {
       allow read: if true;
-      allow create: if canEditParish(request.resource.data.parishId);
-      allow update: if canEditParish(resource.data.parishId)
+      allow create: if request.resource.data.parishId is string
+                    && canEditParish(request.resource.data.parishId);
+      allow update: if request.resource.data.parishId is string
+                    && canEditParish(resource.data.parishId)
                     && canEditParish(request.resource.data.parishId);
       allow delete: if canEditParish(resource.data.parishId);
     }
 
-    // Admin records: a user may read their own; only superadmin manages them.
+    // ── User profiles ───────────────────────────────────────────────────────
+    function newKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function textOk(field, max) {
+      return request.resource.data.get(field, '') is string &&
+             request.resource.data.get(field, '').size() <= max;
+    }
+    function emailOk() {
+      return request.resource.data.email is string &&
+             request.resource.data.email == request.auth.token.get('email', '');
+    }
+
+    // First sign-in: a person creates their own profile as a plain user. The old
+    // admins/{uid} superadmin must create it as superadmin (so they are not demoted by accident).
+    function newProfileOk() {
+      return request.resource.data.keys().hasOnly(
+               ['uid', 'email', 'displayName', 'photoURL', 'role', 'parishIds', 'createdAt', 'lastSignInAt'])
+          && request.resource.data.keys().hasAll(['uid', 'email', 'role', 'parishIds', 'createdAt', 'lastSignInAt'])
+          && request.resource.data.uid == request.auth.uid
+          && emailOk() && textOk('displayName', 200) && textOk('photoURL', 2000)
+          && request.resource.data.parishIds == []
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.lastSignInAt == request.time
+          && ((request.resource.data.role == 'user' && !legacySuper()) ||
+              (request.resource.data.role == 'superadmin' && legacySuper()));
+    }
+
+    // A person may refresh their own name, photo, email and last-sign-in time, never their role.
+    function selfEditOk() {
+      return newKeys().hasOnly(['displayName', 'photoURL', 'email', 'lastSignInAt'])
+          && textOk('displayName', 200) && textOk('photoURL', 2000)
+          && (!newKeys().hasAny(['email']) || emailOk())
+          && (!newKeys().hasAny(['lastSignInAt']) || request.resource.data.lastSignInAt == request.time);
+    }
+
+    // Changing someone else's role (never your own):
+    //   superadmin  any person, any role
+    //   admin       only people who are now user or coordinator, to user / coordinator / admin
+    function roleChangeOk() {
+      return newKeys().hasOnly(['role', 'parishIds'])
+          && request.resource.data.role in ['user', 'coordinator', 'admin', 'superadmin']
+          && request.resource.data.parishIds is list
+          && request.resource.data.parishIds.size() <= 500
+          && (request.resource.data.role == 'coordinator' || request.resource.data.parishIds.size() == 0)
+          && (isSuperAdmin() ||
+              (isAdminUp() &&
+               resource.data.role in ['user', 'coordinator'] &&
+               request.resource.data.role in ['user', 'coordinator', 'admin']));
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdminUp());
+      allow create: if isSignedIn() && request.auth.uid == uid && newProfileOk();
+      allow update: if isSignedIn() &&
+                       ((request.auth.uid == uid && selfEditOk()) ||
+                        (request.auth.uid != uid && roleChangeOk()));
+      // Removes the profile only (the sign-in account stays); superadmin, never themselves.
+      allow delete: if isSuperAdmin() && request.auth.uid != uid;
+    }
+
+    // Retired: the first superadmin's record. Read only, so the profile can be created from it.
     match /admins/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
-      allow write: if isSuperAdmin();
+      allow write: if false;
     }
   }
 }

@@ -5,9 +5,9 @@
 
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebaseAdmin';
-import { setAdminHint } from '../lib/authHint';
+import { setRoleHint } from '../lib/authHint';
 
 export async function adminSignOut(): Promise<void> {
   await signOut(auth);
-  setAdminHint(false);
+  setRoleHint(null);
 }

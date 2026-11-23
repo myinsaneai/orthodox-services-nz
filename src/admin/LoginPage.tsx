@@ -1,17 +1,18 @@
 // src/admin/LoginPage.tsx
-// Admin sign-in: Google or email + password. Anyone can complete a Google
-// sign-in, but only a person with an admins/{uid} record gets into the admin
-// area (and the Firestore rules enforce the same), so a stranger who signs in
-// sees the "no admin access" notice below and can do nothing else.
+// Sign-in: Google or email + password. Anyone can complete a Google sign-in; they
+// get a plain "user" profile (so an admin can then find them on the Users page and
+// give them a role). Coordinators and above go on to My page; a plain user sees
+// the notice below. The Firestore rules enforce the real limits.
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebaseAdmin';
 import { useAuth } from '../contexts/AuthContext';
 import { signInWithGoogle, preloadGis, isGoogleCancel, googleErrorMessage } from './googleSignIn';
 import { embeddedBrowser } from './embeddedBrowser';
+import { isAtLeast } from '../lib/roles';
 
 const input: React.CSSProperties = {
   width: '100%', padding: '9px 10px', marginBottom: 12, fontSize: 14,
@@ -38,7 +39,7 @@ export default function LoginPage() {
   // Fetch Google's script now, so the Google window can open straight from the tap.
   useEffect(() => { preloadGis(); }, []);
 
-  if (!loading && user && role) return <Navigate to="/admin" replace />;
+  if (!loading && user && isAtLeast(role, 'coordinator')) return <Navigate to="/admin" replace />;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -74,14 +75,17 @@ export default function LoginPage() {
     </div>
   );
 
-  // Signed in, but no admins/{uid} record: explain instead of showing the form again.
-  if (!loading && user && !role) {
+  // Signed in, but no admin area for this account: explain instead of showing the form again.
+  if (!loading && user) {
     return shell(
       <>
         <p>
-          You are signed in as <strong>{user.email}</strong>, but this account has not been given
-          admin access yet. Ask a superadmin to add it.
+          You are signed in as <strong>{user.email}</strong>.{' '}
+          {role
+            ? 'This account has no admin area yet. An administrator can give it more access.'
+            : 'We could not load your account. Please try again in a moment.'}
         </p>
+        <p><Link to="/">Go to the site</Link></p>
         <button type="button" style={googleBtn} onClick={() => signOut(auth)}>Sign out</button>
       </>,
     );

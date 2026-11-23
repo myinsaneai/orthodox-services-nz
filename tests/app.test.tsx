@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 // Whole-app routing, plus the admin area with a faked Firebase sign-in.
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, act, waitFor, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, act, waitFor, fireEvent, cleanup, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const h = vi.hoisted(() => ({
-  admin: null as any,
+  profile: null as any,          // what the profile lookup returns for the signed-in person
+  fail: false,                   // true: the profile lookup throws
+  users: [] as any[],
   cb: null as null | ((u: any) => Promise<void>),
   signedOut: 0,
 }));
@@ -19,7 +21,9 @@ vi.mock('../src/lib/firestore', () => ({
   subscribeParishes: (cb: any) => { cb([]); return () => {}; },
   subscribeGroups: (cb: any) => { cb([]); return () => {}; },
   subscribeUpcomingServices: (_s: any, _f: any, cb: any) => { cb([]); return () => {}; },
-  getAdminRecord: async () => h.admin,
+  ensureUserProfile: async () => { if (h.fail) throw new Error('offline'); return h.profile; },
+  listUserProfiles: async () => h.users,
+  setUserRole: async () => {}, deleteUserProfile: async () => {}, toMillis: () => 0,
 }));
 
 import App from '../src/App';
@@ -27,6 +31,14 @@ import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 
 const fbUser = { uid: 'u1', email: 'admin@example.com' };
 const signIn = (u: any) => act(async () => { await h.cb!(u); });
+const profile = (role: string, parishIds: string[] = []) =>
+  ({ uid: 'u1', email: 'admin@example.com', displayName: '', photoURL: '', role, parishIds });
+const open = async (path: string, role: string | null, parishIds: string[] = []) => {
+  h.profile = role ? profile(role, parishIds) : null;
+  mountApp(path);
+  await waitFor(() => expect(h.cb).not.toBeNull());
+  await signIn(fbUser);
+};
 
 // BrowserRouter reads the real URL, so drive the app through the history API.
 function mountApp(path: string) {
@@ -37,7 +49,7 @@ function mountApp(path: string) {
 beforeEach(() => {
   localStorage.clear();
   Object.defineProperty(navigator, 'language', { value: 'en-NZ', configurable: true });
-  h.admin = null; h.cb = null; h.signedOut = 0;
+  h.profile = null; h.fail = false; h.users = []; h.cb = null; h.signedOut = 0;
 });
 afterEach(cleanup);
 
@@ -66,7 +78,7 @@ describe('public routes', () => {
   });
 });
 
-describe('admin area', () => {
+describe('admin area (My page)', () => {
   it('a guest on /admin lands on the sign-in form', async () => {
     mountApp('/admin');
     await waitFor(() => expect(h.cb).not.toBeNull());
@@ -74,61 +86,73 @@ describe('admin area', () => {
     expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
     expect(window.location.pathname).toBe('/admin/login');
   });
-  it('a signed-in person without an admin record cannot get in', async () => {
-    h.admin = null;
-    mountApp('/admin');
-    await waitFor(() => expect(h.cb).not.toBeNull());
-    await signIn(fbUser);
-    expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
-    expect(screen.queryByText('Admin dashboard')).toBeNull();
+  it('a plain user is told there is no admin area for them yet', async () => {
+    await open('/admin', 'user');
+    expect(await screen.findByText(/no admin area yet/)).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'My page' })).toBeNull();
   });
-  it('a parish-admin reaches the dashboard and sees how many parishes they manage', async () => {
-    h.admin = { uid: 'u1', email: 'admin@example.com', role: 'parish-admin', parishIds: ['a', 'b'] };
-    mountApp('/admin');
-    await waitFor(() => expect(h.cb).not.toBeNull());
-    await signIn(fbUser);
-    expect(await screen.findByRole('heading', { name: 'Admin dashboard' })).toBeTruthy();
-    expect(screen.getByText(/admin@example\.com \(parish-admin, 2 parish\(es\)\)/)).toBeTruthy();
+  it('a coordinator reaches My page and sees how many parishes they manage', async () => {
+    await open('/admin', 'coordinator', ['a', 'b']);
+    expect(await screen.findByRole('heading', { name: 'My page' })).toBeTruthy();
+    expect(screen.getByText(/admin@example\.com \(Coordinator, 2 parish\(es\)\)/)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Users' })).toBeNull();      // no Users section for a coordinator
   });
-  it('a superadmin reaches the dashboard', async () => {
-    h.admin = { uid: 'u1', email: 'admin@example.com', role: 'superadmin', parishIds: 'all' };
-    mountApp('/admin');
-    await waitFor(() => expect(h.cb).not.toBeNull());
-    await signIn(fbUser);
-    expect(await screen.findByText(/\(superadmin\)/)).toBeTruthy();
+  it('a coordinator is kept out of the Users page', async () => {
+    await open('/admin/users', 'coordinator', ['a']);
+    expect(await screen.findByText('Access denied')).toBeTruthy();
   });
-  it('a failed role lookup is treated as "not an admin"', async () => {
-    h.admin = undefined;                 // getAdminRecord resolves undefined → falsy
-    mountApp('/admin');
-    await waitFor(() => expect(h.cb).not.toBeNull());
-    await signIn(fbUser);
-    expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
+  it('an admin sees "My page" in the menu and "Users" in a second line', async () => {
+    await open('/admin', 'admin');
+    expect(await screen.findByRole('heading', { name: 'My page' })).toBeTruthy();
+    const main = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(within(main).getByRole('link', { name: 'My page' }).getAttribute('href')).toBe('/admin');
+    const sub = screen.getByRole('navigation', { name: 'My page sections' });
+    expect(within(sub).getByRole('link', { name: 'Users' }).getAttribute('href')).toBe('/admin/users');
+    expect(screen.getByText(/\(Admin\)/)).toBeTruthy();
   });
-  it('signing out of the dashboard returns to the sign-in form', async () => {
-    h.admin = { uid: 'u1', email: 'admin@example.com', role: 'superadmin', parishIds: 'all' };
-    mountApp('/admin');
-    await waitFor(() => expect(h.cb).not.toBeNull());
-    await signIn(fbUser);
-    await screen.findByRole('heading', { name: 'Admin dashboard' });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(h.signedOut).toBe(1);
+  it('the Users line opens the Users page for an admin', async () => {
+    h.users = [{ ...profile('user'), uid: 'u2', email: 'maria@example.com', displayName: 'Maria' }];
+    await open('/admin', 'admin');
+    await screen.findByRole('heading', { name: 'My page' });
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'My page sections' })).getByRole('link', { name: 'Users' }));
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeTruthy();
+    expect(await screen.findByText('Maria')).toBeTruthy();
+    expect(window.location.pathname).toBe('/admin/users');
+  });
+  it('a superadmin reaches My page', async () => {
+    await open('/admin', 'superadmin');
+    expect(await screen.findByText(/\(SuperAdmin\)/)).toBeTruthy();
+  });
+  it('a failed profile lookup is treated as "could not load", not as an admin', async () => {
+    h.fail = true;
+    await open('/admin', 'superadmin');
+    expect(await screen.findByText(/could not load your account/)).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'My page' })).toBeNull();
+  });
+  it('"Log out" in the header returns to the sign-in form', async () => {
+    await open('/admin', 'superadmin');
+    await screen.findByRole('heading', { name: 'My page' });
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await waitFor(() => expect(h.signedOut).toBe(1));
     await signIn(null);                  // Firebase reports the sign-out
     expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
   });
 });
 
 describe('header hint written by the admin area', () => {
-  it('is on for an admin, and off after sign-out or for a person without a record', async () => {
-    h.admin = { uid: 'u1', email: 'admin@example.com', role: 'superadmin', parishIds: 'all' };
-    mountApp('/admin');
-    await waitFor(() => expect(h.cb).not.toBeNull());
-    await signIn(fbUser);
-    expect(localStorage.getItem('gp_admin')).toBe('1');
+  it('holds the role, and is cleared after sign-out', async () => {
+    await open('/admin', 'superadmin');
+    expect(localStorage.getItem('gp_role')).toBe('superadmin');
     await signIn(null);
-    expect(localStorage.getItem('gp_admin')).toBeNull();
-    h.admin = null;
+    expect(localStorage.getItem('gp_role')).toBeNull();
+    h.profile = profile('user');
     await signIn(fbUser);
-    expect(localStorage.getItem('gp_admin')).toBeNull();
+    expect(localStorage.getItem('gp_role')).toBe('user');
+  });
+  it('is not left behind when the profile cannot be loaded', async () => {
+    h.fail = true;
+    await open('/admin', 'user');
+    expect(localStorage.getItem('gp_role')).toBeNull();
   });
   it('public pages show "Log in" for a visitor', async () => {
     mountApp('/services');
@@ -141,29 +165,31 @@ describe('who may edit which parish (AuthContext.canEditParish)', () => {
     const { canEditParish, role } = useAuth();
     return <p>{String(role)}: a={String(canEditParish('a'))} b={String(canEditParish('b'))} c={String(canEditParish('c'))}</p>;
   }
-  const mountProbe = () => render(<MemoryRouter><AuthProvider><Probe /></AuthProvider></MemoryRouter>);
+  const mountProbe = (role: string | null, parishIds: string[] = []) => {
+    h.profile = role ? profile(role, parishIds) : null;
+    return render(<MemoryRouter><AuthProvider><Probe /></AuthProvider></MemoryRouter>);
+  };
 
-  it('a superadmin may edit every parish', async () => {
-    h.admin = { role: 'superadmin', parishIds: 'all' };
-    mountProbe(); await signIn(fbUser);
+  it('superadmins and admins may edit every parish', async () => {
+    mountProbe('superadmin'); await signIn(fbUser);
     expect(screen.getByText('superadmin: a=true b=true c=true')).toBeTruthy();
-  });
-  it('a parish-admin may edit only the listed parishes', async () => {
-    h.admin = { role: 'parish-admin', parishIds: ['a', 'b'] };
-    mountProbe(); await signIn(fbUser);
-    expect(screen.getByText('parish-admin: a=true b=true c=false')).toBeTruthy();
-  });
-  it('a parish-admin with no parishes, or with "all" by mistake, may edit nothing', async () => {
-    h.admin = { role: 'parish-admin', parishIds: [] };
-    mountProbe(); await signIn(fbUser);
-    expect(screen.getByText('parish-admin: a=false b=false c=false')).toBeTruthy();
     cleanup();
-    h.admin = { role: 'parish-admin', parishIds: 'all' };
-    mountProbe(); await signIn(fbUser);
-    expect(screen.getByText('parish-admin: a=false b=false c=false')).toBeTruthy();
+    mountProbe('admin'); await signIn(fbUser);
+    expect(screen.getByText('admin: a=true b=true c=true')).toBeTruthy();
+  });
+  it('a coordinator may edit only the listed parishes', async () => {
+    mountProbe('coordinator', ['a', 'b']); await signIn(fbUser);
+    expect(screen.getByText('coordinator: a=true b=true c=false')).toBeTruthy();
+  });
+  it('a coordinator with no parishes, and a plain user, may edit nothing', async () => {
+    mountProbe('coordinator', []); await signIn(fbUser);
+    expect(screen.getByText('coordinator: a=false b=false c=false')).toBeTruthy();
+    cleanup();
+    mountProbe('user', ['a']); await signIn(fbUser);
+    expect(screen.getByText('user: a=false b=false c=false')).toBeTruthy();
   });
   it('nobody signed in may edit anything', async () => {
-    mountProbe(); await signIn(null);
+    mountProbe(null); await signIn(null);
     expect(screen.getByText('null: a=false b=false c=false')).toBeTruthy();
   });
 });

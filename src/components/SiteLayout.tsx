@@ -3,13 +3,14 @@
 // seals flanking the site title, nav row (Services / Parishes / About + language).
 
 import React, { useState } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useLang } from '../contexts/LangContext';
 import { t } from '../lib/i18n';
 import type { StringKey } from '../lib/i18n';
 import LangToggle from './LangToggle';
-import { useAdminHint } from '../hooks/useAdminHint';
-import { setAdminHint } from '../lib/authHint';
+import { useRoleHint } from '../hooks/useRoleHint';
+import { setRoleHint } from '../lib/authHint';
+import { isAtLeast } from '../lib/roles';
 import sealLeft from '../assets/seals/seal-left-ecumenical-patriarchate.png';
 import sealRight from '../assets/seals/seal-right-holy-metropolis-nz.png';
 
@@ -19,13 +20,20 @@ const NAV: { to: string; key: StringKey }[] = [
   { to: '/about',    key: 'navAbout' },
 ];
 
+// "My page" is in the menu for admins and superadmins (other roles get theirs later).
+// Inside it, a second line shows the My page sections; more are added here.
+const MY_PAGE = { to: '/admin', key: 'navMyPage' as StringKey };
+const MY_PAGE_SECTIONS: { to: string; key: StringKey }[] = [
+  { to: '/admin/users', key: 'navUsers' },
+];
+
 // Log in / Log out sits next to the menu, outside the <nav>, so the menu stays
 // exactly Services, Parishes, About + language. It shows "Log out" from a
 // stored hint written by the admin area; Firebase Auth itself is loaded only
 // when "Log out" is clicked, never for ordinary visitors.
 function AccountControl() {
   const { lang } = useLang();
-  const signedIn = useAdminHint();
+  const signedIn = useRoleHint() !== null;
   const [busy, setBusy] = useState(false);
 
   if (!signedIn) {
@@ -37,23 +45,24 @@ function AccountControl() {
       const { adminSignOut } = await import('../admin/signOut');
       await adminSignOut();
     } catch {
-      setAdminHint(false);          // could not reach Firebase: at least stop showing "Log out"
+      setRoleHint(null);            // could not reach Firebase: at least stop showing "Log out"
     } finally {
       setBusy(false);
     }
   };
   return (
-    <>
-      <Link className="site-account__link" to="/admin">{t('adminLink', lang)}</Link>
-      <button type="button" className="site-account__btn" onClick={logOut} disabled={busy}>
-        {t('logOut', lang)}
-      </button>
-    </>
+    <button type="button" className="site-account__btn" onClick={logOut} disabled={busy}>
+      {t('logOut', lang)}
+    </button>
   );
 }
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   const { lang } = useLang();
+  const { pathname } = useLocation();
+  const hasMyPage = isAtLeast(useRoleHint(), 'admin');
+  const items = hasMyPage ? [...NAV, MY_PAGE] : NAV;
+  const inMyPage = hasMyPage && (pathname === '/admin' || pathname.startsWith('/admin/'));
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -63,7 +72,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           <div className="site-title">{t('siteTitle', lang)}</div>
           <div className="site-menu">
           <nav aria-label="Main navigation" className="site-nav">
-            {NAV.map(item => (
+            {items.map(item => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -79,6 +88,13 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           </nav>
           <div className="site-account"><AccountControl /></div>
           </div>
+          {inMyPage && (
+            <nav aria-label="My page sections" className="site-subnav">
+              {MY_PAGE_SECTIONS.map(s => (
+                <NavLink key={s.to} to={s.to} className="site-subnav__link">{t(s.key, lang)}</NavLink>
+              ))}
+            </nav>
+          )}
         </div>
         <img className="seal" src={sealRight} alt="Holy Metropolis of New Zealand" />
       </header>

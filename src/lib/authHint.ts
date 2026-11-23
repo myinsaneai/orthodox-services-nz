@@ -1,24 +1,32 @@
 // src/lib/authHint.ts
-// A one-bit hint that an admin is signed in, so the public header can show
-// "Log out" without loading firebase/auth for every visitor. The admin area
-// (AuthContext) writes it; it is only a display hint, never a permission:
-// the real checks are Firebase Auth and the Firestore rules.
+// The signed-in person's role, kept as a hint so the public header can show
+// "Log out" and (for admins) "My page" without loading firebase/auth for every
+// visitor. The admin area (AuthContext) writes it; it is only for display,
+// never a permission: the real checks are Firebase Auth and the Firestore rules.
 
-const KEY = 'gp_admin';
-const EVENT = 'gp-admin-hint';
+import { isRole } from './roles';
+import type { RoleName } from './roles';
 
-export function getAdminHint(): boolean {
-  try { return localStorage.getItem(KEY) === '1'; } catch { return false; }
+const KEY = 'gp_role';
+const OLD_KEY = 'gp_admin';          // the first version stored just "1"
+const EVENT = 'gp-role-hint';
+
+export function getRoleHint(): RoleName | null {
+  try {
+    const v = localStorage.getItem(KEY);
+    return isRole(v) ? v : null;
+  } catch { return null; }
 }
 
-export function setAdminHint(on: boolean): void {
+export function setRoleHint(role: RoleName | null): void {
   try {
-    if (on) localStorage.setItem(KEY, '1'); else localStorage.removeItem(KEY);
+    if (role) localStorage.setItem(KEY, role); else localStorage.removeItem(KEY);
+    localStorage.removeItem(OLD_KEY);
   } catch { /* storage blocked: the header simply shows "Log in" */ }
   window.dispatchEvent(new Event(EVENT));
 }
 
-export function subscribeAdminHint(cb: () => void): () => void {
+export function subscribeRoleHint(cb: () => void): () => void {
   const onStorage = (e: StorageEvent) => { if (e.key === KEY || e.key === null) cb(); };
   window.addEventListener(EVENT, cb);
   window.addEventListener('storage', onStorage);

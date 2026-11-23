@@ -23,7 +23,7 @@ function block(name: string): string {
 
 describe('firestore.rules', () => {
   it('the code uses the expected collections', () => {
-    expect([...used].sort()).toEqual(['admins', 'groups', 'parishes', 'services', 'settings']);
+    expect([...used].sort()).toEqual(['admins', 'groups', 'parishes', 'services', 'settings', 'users']);
   });
   it('every collection the code touches has a rule block', () => {
     used.forEach(c => expect(matched.has(c), `no rule for "${c}"`).toBe(true));
@@ -39,29 +39,65 @@ describe('firestore.rules', () => {
       expect(b, c).toMatch(/allow write: if isSuperAdmin\(\)/);
     });
   });
-  it('admin records are never publicly readable and only a superadmin writes them', () => {
+  it('the retired admins records are readable only by their owner or a superadmin, and nobody writes them', () => {
     const b = block('admins');
     expect(b).not.toMatch(/allow read: if true/);
     expect(b).toMatch(/request\.auth\.uid == uid/);
-    expect(b).toMatch(/allow write: if isSuperAdmin\(\)/);
+    expect(b).toMatch(/allow write: if false/);
+  });
+  it('user profiles: read by the owner or an admin, never public', () => {
+    const b = block('users');
+    expect(b).not.toMatch(/if true/);
+    expect(b).toMatch(/allow read: if isSignedIn\(\) && \(request\.auth\.uid == uid \|\| isAdminUp\(\)\)/);
+  });
+  it('user profiles: a person creates only their own, as a plain user (or the old superadmin)', () => {
+    expect(block('users')).toMatch(/allow create: if isSignedIn\(\) && request\.auth\.uid == uid && newProfileOk\(\)/);
+    expect(rules).toMatch(/request\.resource\.data\.role == 'user'/);
+    expect(rules).toMatch(/request\.resource\.data\.role == 'superadmin' && legacySuper\(\)/);
+    expect(rules).toMatch(/request\.resource\.data\.role == 'user' && !legacySuper\(\)/);   // the old superadmin cannot create themselves as a user
+    expect(rules).toMatch(/request\.resource\.data\.parishIds == \[\]/);
+  });
+  it('user profiles: a person cannot change their own role; role changes are for somebody else', () => {
+    const b = block('users');
+    expect(b).toMatch(/request\.auth\.uid == uid && selfEditOk\(\)/);
+    expect(b).toMatch(/request\.auth\.uid != uid && roleChangeOk\(\)/);
+    // the self-edit may touch these fields and nothing else
+    expect(rules).toMatch(/hasOnly\(\['displayName', 'photoURL', 'email', 'lastSignInAt'\]\)/);
+    // a role change touches only role and parishIds
+    expect(rules).toMatch(/hasOnly\(\['role', 'parishIds'\]\)/);
+  });
+  it('role changes: a superadmin anything; an admin only user/coordinator targets and never to superadmin', () => {
+    const fn = rules.slice(rules.indexOf('function roleChangeOk'), rules.indexOf('match /users/'));
+    expect(fn).toMatch(/isSuperAdmin\(\) \|\|/);
+    expect(fn).toMatch(/resource\.data\.role in \['user', 'coordinator'\]/);
+    expect(fn).toMatch(/request\.resource\.data\.role in \['user', 'coordinator', 'admin'\]/);
+  });
+  it('only a superadmin deletes profiles, and never their own', () => {
+    expect(block('users')).toMatch(/allow delete: if isSuperAdmin\(\) && request\.auth\.uid != uid/);
   });
   it('services are written only for the parish the person may edit, on both old and new data', () => {
     const b = block('services');
     expect(b).toMatch(/allow read: if true/);
-    expect(b).toMatch(/allow create: if canEditParish\(request\.resource\.data\.parishId\)/);
-    expect(b).toMatch(/allow update: if canEditParish\(resource\.data\.parishId\)\s*&&\s*canEditParish\(request\.resource\.data\.parishId\)/);
+    expect(b).toMatch(/allow create: if request\.resource\.data\.parishId is string\s*&&\s*canEditParish\(request\.resource\.data\.parishId\)/);
+    expect(b).toMatch(/allow update: if request\.resource\.data\.parishId is string\s*&&\s*canEditParish\(resource\.data\.parishId\)\s*&&\s*canEditParish\(request\.resource\.data\.parishId\)/);
     expect(b).toMatch(/allow delete: if canEditParish\(resource\.data\.parishId\)/);
   });
-  it('a parish-admin is limited to the parishes listed on their admin record', () => {
-    expect(rules).toMatch(/role == 'parish-admin'/);
-    expect(rules).toMatch(/parishId in adminDoc\(\)\.parishIds/);
+  it('a coordinator is limited to the parishes listed on their profile; admins edit all', () => {
+    const fn = rules.slice(rules.indexOf('function canEditParish'), rules.indexOf('// Public read'));
+    expect(fn).toMatch(/isAdminUp\(\)/);
+    expect(fn).toMatch(/isCoordinator\(\)/);
+    expect(fn).toMatch(/parishId in get\(myProfile\(\)\)\.data\.parishIds/);
+  });
+  it('the old superadmin record counts only while the person has no profile yet', () => {
+    expect(rules).toMatch(/\(!hasProfile\(\) && legacySuper\(\)\)/);
   });
   it('uses the same role names as the app', () => {
-    const ctx = readFileSync('src/contexts/AuthContext.tsx', 'utf8');
-    ['superadmin', 'parish-admin'].forEach(r => {
+    const roles = readFileSync('src/lib/roles.ts', 'utf8');
+    ['user', 'coordinator', 'admin', 'superadmin'].forEach(r => {
       expect(rules).toContain(`'${r}'`);
-      expect(ctx).toContain(`'${r}'`);
+      expect(roles).toContain(`'${r}'`);
     });
+    expect(rules).not.toContain('parish-admin');
   });
 });
 
