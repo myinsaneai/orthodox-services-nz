@@ -2,12 +2,13 @@
 
 Read this file and `README.md` first. The README holds the requirements, data model and phase plan. This file holds everything else: decisions, how we work, how the code is laid out, traps already hit, and what is next. The repo is the source of truth, so clone it instead of asking for files to be pasted.
 
-## 1. Snapshot (as of the scaffold, tests and handover commits, late November 2026)
+## 1. Snapshot (as of commit `baf1037` "Alignment changed", 23 November 2026)
+**Current focus: Firebase setup** (section 10a is the checklist for it).
 - **What:** website with the service schedules of the parishes of the Greek Orthodox Church in New Zealand and Oceania. Views: one parish, a named group of parishes, all parishes. English and Greek, mobile-friendly. Roles: visitor, parish admin, superadmin.
 - **Repo:** https://github.com/myinsaneai/orthodox-services-nz. Local path on the developer's machine: `C:\React\orthodox-schedule-nz` (Windows, PowerShell). The folder name differs from the repo name; that does not matter to git.
 - **Firebase project:** **not created yet.** `.firebaserc` holds the placeholder `REPLACE-WITH-FIREBASE-PROJECT-ID`; `.env.local` does not exist. Nothing has been deployed, so there is no live site.
 - **People:** the developer is Alexei. He chose the design himself after reviewing four mock-ups.
-- **Live status:** nothing is live. Verified so far: unit/component tests with faked Firebase, a production build, a clean `npm audit`, and a look at the public pages in a headless browser at 1100 and 390 px wide in English and Greek (no horizontal overflow, header and seals correct) **with no data** (empty Firestore).
+- **Live status:** nothing is live. Verified so far (on a fresh clone of `baf1037`): 90 tests in 9 files pass, production build passes, `npm audit` 0 vulnerabilities, no secrets tracked; the public pages were looked at in a headless browser at 390, 1100, 1600 and 2560 px in English and Greek **with no data** (empty Firestore).
 - **Design:** Option A "Cathedral Classic": maroon `#7A1F0A` header with the two seals flanking the title, cream `#F3E8D9` hero band, gold `#C9A66C` accents, Cormorant Garamond + Nunito Sans. The Option A prototype is on a private Claude page only the developer can open: https://claude.ai/artifact/EjUVe3aM9kHMUW8WnZevQK. The code is now the design reference.
 
 ## 2. How we work (please keep doing this)
@@ -90,13 +91,13 @@ Not built: any admin editor (parishes, groups, services, users), recurring servi
 See README "Open decisions": Firestore location, recurring services, what a group is, parish detail fields, About content, the real parish list, domain name. The two that block the next steps are the **Firestore location** and the **real parish list and groups**.
 
 ## 9a. Outside the repository (check these in a new thread before debugging)
-- **GitHub:** `myinsaneai/orthodox-services-nz` was created empty; the first push is done by the developer from `C:\React\orthodox-schedule-nz`. The first commit in the zip was authored as "Claude"; the developer re-authors it with `git commit --amend --reset-author --no-edit` before the first push.
+- **GitHub:** `myinsaneai/orthodox-services-nz` (public) has three commits on `main`, all authored by the developer: scaffold, tests and handover, then the wide-screen layout (`baf1037`). The developer commits and pushes from `C:\React\orthodox-schedule-nz`.
 - **Firebase console (to do):** create the project and a web app; create Firestore (choose the location); enable Authentication → Email/Password; add Authorized domains; add the first user and the `admins/{uid}` document (README, "Firebase setup").
 - **Developer's machine (git-ignored):** `.env.local` with the `VITE_FIREBASE_*` values, and the project id in `.firebaserc`.
 - **Seals:** the two source images (Ecumenical Patriarchate, Holy Metropolis of New Zealand, the new version covering Fiji, Tonga and Samoa, 1970) are the client's files, kept in `src/assets/seals/`.
 
 ## 10. Next steps
-1. Developer: first push to GitHub; create the Firebase project; fill `.env.local` and `.firebaserc`; deploy rules and indexes; create the first superadmin. (Decide the Firestore location first.)
+1. **Firebase setup** (section 10a): create the project, fill `.env.local` and `.firebaserc`, deploy rules and indexes, create the first superadmin, check it end to end with demo data, deploy to Hosting. Decide the Firestore location first.
 2. Error and offline states on the three Firestore-backed pages (no more false "no services"), with tests.
 3. Seed data: a script or a superadmin-only screen to load the real parishes, groups and starter services (needs the real list).
 4. Admin editors: parishes, groups, services (single entries first, then recurring templates with feast-day overrides), users (assigning `parishIds`). Each parish-scoped screen must respect `canEditParish`.
@@ -106,5 +107,34 @@ See README "Open decisions": Firestore location, recurring services, what a grou
 8. Real-device QA (phones, Greek text, long titles, many services), accessibility pass.
 9. Smaller: export or print view of a week's schedule, a calendar (.ics) link per parish, pagination if lists grow, more than 30 parishes in a group.
 
+## 10a. Firebase setup: checklist for the next thread
+
+**What the developer brings to the thread:** the Firebase project id, the Firestore location they chose, and the web-app config values (`apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`; these are public and safe to paste). **Never paste** passwords, service-account JSON or private keys; nothing here needs them. The assistant cannot reach the Firebase console, so the developer does the clicking and reports what they see (screenshots help).
+
+**Before starting, know these (they cost time if hit blind):**
+- **Do not run `firebase init` over this repo.** It offers to overwrite `firebase.json`, `firestore.rules` and `firestore.indexes.json`, which are already correct. Instead: `npm i -g firebase-tools`, `firebase login`, then put the project id in `.firebaserc` (or `firebase use --add`).
+- **`firebase.json` also lists Storage rules.** Storage is not used yet and may need a paid plan or a bucket to exist. Deploy with `--only`, never a bare `firebase deploy`: `firebase deploy --only firestore:rules,firestore:indexes` and later `--only hosting`. Check the current Storage requirements in the console before ever enabling it.
+- **The Firestore location is permanent.** Examples near New Zealand: Sydney `australia-southeast1`, Melbourne `australia-southeast2`; confirm the current list in the console. If the console asks for an edition or a mode, choose Firestore Standard, native mode, **production mode** (the repo's rules are deployed straight afterwards).
+- **`VITE_*` values are baked in at build time.** After editing `.env.local`, restart `npm run dev`; before deploying, run `npm run build` again.
+- PowerShell: `copy .env.example .env.local`. `.env.local` is git-ignored; never commit it.
+- Documents created by hand in the console must **not** contain an `id` field (the code does `{ id: doc.id, ...data }`, so a stored `id` would override the document id). Types matter: `order` is a number, `visible` a boolean, `date`/`time` are text.
+
+**Steps, in order, each with what to check:**
+1. **Create the project** (console), add a **web app**, copy the config into `.env.local`; set the project id in `.firebaserc`. *Check:* `firebase projects:list` shows it; `npm run dev` starts.
+2. **Create Firestore** (location chosen, production mode). *Check:* an empty database exists.
+3. **Deploy rules and indexes:** `firebase deploy --only firestore:rules,firestore:indexes`. *Check:* Rules tab shows the repo's rules; Indexes tab shows the two `services` indexes as Enabled (they can take a few minutes to build).
+4. **Authentication:** enable Email/Password; Authorized domains should already include `<project>.web.app` and `localhost`. Add the first user (Authentication → Users) and copy its UID.
+5. **First superadmin:** in Firestore create collection `admins`, document id = that UID, fields `uid` (string), `email` (string), `role` = `superadmin` (string), `parishIds` = `all` (string). *Check:* sign in at `http://localhost:5173/admin/login`; the dashboard says `Signed in as <email> (superadmin)`. If it bounces back to the login form, the `admins/{uid}` document is missing, has a different id, or the rules were not deployed.
+6. **Demo data** (create by hand, delete later). Use parish id `holy-trinity`, group id `wellington`:
+   - `groups/wellington`: `slug` "wellington", `nameEn` "Wellington group", `nameEl` "Ομάδα Γουέλλινγκτον", `order` 1
+   - `parishes/holy-trinity`: `slug` "holy-trinity", `nameEn` "Holy Trinity", `nameEl` "Αγία Τριάδα", `city` "Wellington", `address` "", `groupIds` ["wellington"], `accentColor` "#4B6B53", `order` 1, `visible` true
+   - `services/demo-1`: `parishId` "holy-trinity", `date` a future `YYYY-MM-DD`, `time` "09:00", `titleEn` "Sunday Orthros & Liturgy", `titleEl` "Όρθρος και Θεία Λειτουργία", `notesEn` "", `notesEl` "", `updatedAt` (timestamp, optional)
+   *Check:* `/services` shows the service; the Wellington group chip and `?parish=holy-trinity` show it; setting `visible` to false hides it everywhere; `/parishes` lists the parish. The browser console must show **no** "requires an index" error (if it does, step 3 is incomplete).
+7. **Parish admin check:** add a second Auth user with an `admins` document (`role` `parish-admin`, `parishIds` ["holy-trinity"]); use the Rules Playground (Firestore → Rules) to confirm they may write a `services` document for `holy-trinity` and not for another parish. (The editors that use this do not exist yet; the playground is the way to test the rules until emulator tests exist.)
+8. **Deploy to Hosting:** `npm run build` then `firebase deploy --only hosting`. *Check on the live address:* `/services` loads; refreshing `/parishes` and `/admin/login` works (SPA rewrite); sign-in works on the live domain; both languages; a phone.
+9. **Report back, then clean up:** delete the demo documents (or keep them until the real data is seeded). Update this file (section 1 and 9a: project id, location, live address, what was verified), commit, push; the assistant then verifies the pushed commit on a fresh clone as usual.
+
+**Likely snags:** "Missing or insufficient permissions" in the console means rules are not deployed or the signed-in user has no `admins` document; a Firestore "requires an index" error means indexes are still building or were not deployed; a blank page on the live site usually means `.env.local` was empty at build time.
+
 ## 11. Starter prompt for the new thread
-> Continue the Orthodox Services NZ project (React + Vite + Firebase, service schedules for Greek Orthodox parishes in New Zealand). Repo: https://github.com/myinsaneai/orthodox-services-nz (public). First clone it and read `README.md` and `HANDOVER.md`; do not ask me to paste files. Follow the working agreement in section 2 of HANDOVER.md (zip of changed files, tests, then verify my commit on a fresh clone). Keep replies concise and avoid reprinting large files. Then read sections 8 to 10 (what is confirmed, what is not, the settings that live outside the repository, next steps). First task: <describe it>.
+> Continue the Orthodox Services NZ project (React + Vite + Firebase, service schedules for Greek Orthodox parishes in New Zealand). Repo: https://github.com/myinsaneai/orthodox-services-nz (public). First clone it and read `README.md` and `HANDOVER.md`; do not ask me to paste files. Follow the working agreement in section 2 of HANDOVER.md (zip of changed files, tests, then verify my commit on a fresh clone). Keep replies concise and avoid reprinting large files. Then read sections 8 to 10 (what is confirmed, what is not, the settings that live outside the repository, next steps). First task: Firebase setup, following section 10a of HANDOVER.md step by step. I will do the console steps and report what I see; I have chosen / still need to choose the Firestore location: <write it here>. My Firebase project id is: <write it here or say not created yet>.
