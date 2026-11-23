@@ -109,32 +109,30 @@ describe('Google button', () => {
   });
 });
 
-describe('signed in, but no admin area', () => {
-  it('a plain user gets an explanation instead of the form, and can sign out', () => {
-    h.auth = { user: { email: 'stranger@example.com' }, role: 'user', loading: false };
+describe('after signing in', () => {
+  it('says so, with a way out, when the profile could not be loaded', () => {
+    h.auth = { user: { email: 'stranger@example.com' }, role: null, loading: false };
     mount();
     expect(screen.getByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
     expect(screen.getByText('stranger@example.com')).toBeTruthy();
-    expect(screen.getByText(/no admin area yet/)).toBeTruthy();
+    expect(screen.getByText(/could not load your account/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Go to the site' })).toBeTruthy();
     expect(screen.queryByPlaceholderText('Email')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(h.signOut).toHaveBeenCalledTimes(1);
   });
-  it('says so when the profile could not be loaded', () => {
-    h.auth = { user: { email: 'a@b.c' }, role: null, loading: false };
-    mount();
-    expect(screen.getByText(/could not load your account/)).toBeTruthy();
-  });
-  it('a coordinator or above is sent on to My page', () => {
-    h.auth = { user: { email: 'a@b.c' }, role: 'coordinator', loading: false };
-    const { container } = mount();
-    expect(container.textContent).not.toMatch(/Admin sign in/);
+  it('every role leaves the sign-in page (the app sends them to the first page)', () => {
+    ['user', 'coordinator', 'admin', 'superadmin'].forEach(role => {
+      h.auth = { user: { email: 'a@b.c' }, role, loading: false };
+      const { container } = mount();
+      expect(container.textContent).not.toMatch(/Admin sign in/);
+      cleanup();
+    });
   });
   it('shows the normal form while the profile is still loading', () => {
     h.auth = { user: { email: 'a@b.c' }, role: null, loading: true };
     mount();
-    expect(screen.queryByText(/no admin area yet/)).toBeNull();
+    expect(screen.queryByText(/could not load your account/)).toBeNull();
     expect(screen.getByPlaceholderText('Email')).toBeTruthy();
   });
 });

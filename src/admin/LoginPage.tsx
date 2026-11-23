@@ -1,8 +1,9 @@
 // src/admin/LoginPage.tsx
 // Sign-in: Google or email + password. Anyone can complete a Google sign-in; they
 // get a plain "user" profile (so an admin can then find them on the Users page and
-// give them a role). Coordinators and above go on to My page; a plain user sees
-// the notice below. The Firestore rules enforce the real limits.
+// give them a role). After signing in everybody goes to the first page; the notice
+// below appears only when the profile could not be loaded. The Firestore rules
+// enforce the real limits.
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -12,7 +13,6 @@ import { auth } from '../lib/firebaseAdmin';
 import { useAuth } from '../contexts/AuthContext';
 import { signInWithGoogle, preloadGis, isGoogleCancel, googleErrorMessage } from './googleSignIn';
 import { embeddedBrowser } from './embeddedBrowser';
-import { isAtLeast } from '../lib/roles';
 
 const input: React.CSSProperties = {
   width: '100%', padding: '9px 10px', marginBottom: 12, fontSize: 14,
@@ -39,7 +39,8 @@ export default function LoginPage() {
   // Fetch Google's script now, so the Google window can open straight from the tap.
   useEffect(() => { preloadGis(); }, []);
 
-  if (!loading && user && isAtLeast(role, 'coordinator')) return <Navigate to="/admin" replace />;
+  // Signed in: go to the first page (not to My page; the header's "My page" is one click away).
+  if (!loading && user && role) return <Navigate to="/" replace />;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -75,15 +76,13 @@ export default function LoginPage() {
     </div>
   );
 
-  // Signed in, but no admin area for this account: explain instead of showing the form again.
+  // Signed in, but the profile could not be loaded: explain instead of showing the form again.
   if (!loading && user) {
     return shell(
       <>
         <p>
-          You are signed in as <strong>{user.email}</strong>.{' '}
-          {role
-            ? 'This account has no admin area yet. An administrator can give it more access.'
-            : 'We could not load your account. Please try again in a moment.'}
+          You are signed in as <strong>{user.email}</strong>, but we could not load your
+          account. Please try again in a moment.
         </p>
         <p><Link to="/">Go to the site</Link></p>
         <button type="button" style={googleBtn} onClick={() => signOut(auth)}>Sign out</button>

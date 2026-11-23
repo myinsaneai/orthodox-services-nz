@@ -143,7 +143,7 @@ describe('loading', () => {
 describe('layout hooks', () => {
   it('heading in the hero band, services in the card grid', () => {
     const { container } = mount();
-    expect(container.querySelector('.hero h1')?.textContent).toBe('Services & Sacred Mysteries');
+    expect(container.querySelector('.hero h1')?.textContent).toBe('Services');
     expect(container.querySelector('.hero-sub')).toBeTruthy();
     expect(container.querySelectorAll('.page > .cards-grid > div')).toHaveLength(3);   // 3 visible parishes' services
   });
@@ -174,7 +174,7 @@ describe('Greek', () => {
   it('shows Greek headings, parish names and group chips', () => {
     h.services = [svc('s1', 'holy-trinity', 'Sunday Liturgy', '2026-12-06', '09:00', { titleEl: 'Κυριακάτικη Θεία Λειτουργία' })];
     mount();
-    expect(screen.getByRole('heading', { name: 'Ακολουθίες & Μυστήρια' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Ακολουθίες' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Ομάδα Γουέλλινγκτον' })).toBeTruthy();
     expect(screen.getByText(/Αγία Τριάδα, Γουέλλινγκτον — Κυριακάτικη Θεία Λειτουργία/)).toBeTruthy();
   });

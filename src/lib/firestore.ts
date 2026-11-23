@@ -16,6 +16,8 @@ import {
 import type { Unsubscribe } from 'firebase/firestore';
 import { db } from './firebase';
 import { isRole } from './roles';
+import { signInMethods } from './signIn';
+import type { SignInMethod } from './signIn';
 import type { RoleName } from './roles';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -68,6 +70,7 @@ export interface UserProfile {
   photoURL: string;
   role: RoleName;
   parishIds: string[];     // parishes a coordinator may edit; empty for every other role
+  providers: SignInMethod[]; // how the person signs in; empty when not known yet (older profiles)
   createdAt: unknown;      // Firestore Timestamp
   lastSignInAt: unknown;   // Firestore Timestamp
 }
@@ -160,6 +163,7 @@ const asProfile = (uid: string, d: Record<string, unknown>): UserProfile => ({
   photoURL: String(d.photoURL ?? ''),
   role: isRole(d.role) ? d.role : 'user',
   parishIds: Array.isArray(d.parishIds) ? (d.parishIds as string[]) : [],
+  providers: Array.isArray(d.providers) ? (d.providers as unknown[]).filter((m): m is SignInMethod => m === 'google' || m === 'password') : [],
   createdAt: d.createdAt ?? null,
   lastSignInAt: d.lastSignInAt ?? null,
 });
@@ -170,21 +174,25 @@ const asProfile = (uid: string, d: Record<string, unknown>): UserProfile => ({
  * Name, photo and "last sign-in" are refreshed at most twice a day.
  */
 export async function ensureUserProfile(
-  u: { uid: string; email: string | null; displayName: string | null; photoURL: string | null },
+  u: {
+    uid: string; email: string | null; displayName: string | null; photoURL: string | null;
+    providerData?: { providerId: string }[];
+  },
 ): Promise<UserProfile> {
   const ref = doc(db, 'users', u.uid);
   const fresh = { email: u.email ?? '', displayName: u.displayName ?? '', photoURL: u.photoURL ?? '' };
+  const providers = signInMethods(u.providerData);
   const snap = await getDoc(ref);
 
   if (snap.exists()) {
     const profile = asProfile(u.uid, snap.data());
     const stale = Date.now() - toMillis(profile.lastSignInAt) > REFRESH_AFTER_MS;
     const changed = profile.email !== fresh.email || profile.displayName !== fresh.displayName
-      || profile.photoURL !== fresh.photoURL;
+      || profile.photoURL !== fresh.photoURL || profile.providers.join() !== providers.join();
     if (stale || changed) {
-      try { await updateDoc(ref, { ...fresh, lastSignInAt: serverTimestamp() }); } catch { /* best effort */ }
+      try { await updateDoc(ref, { ...fresh, providers, lastSignInAt: serverTimestamp() }); } catch { /* best effort */ }
     }
-    return { ...profile, ...fresh };
+    return { ...profile, ...fresh, providers };
   }
 
   let legacy: AdminRecord | null = null;
@@ -192,15 +200,15 @@ export async function ensureUserProfile(
   const role: RoleName = legacy?.role === 'superadmin' ? 'superadmin' : 'user';
   try {
     await setDoc(ref, {
-      uid: u.uid, ...fresh, role, parishIds: [],
+      uid: u.uid, ...fresh, providers, role, parishIds: [],
       createdAt: serverTimestamp(), lastSignInAt: serverTimestamp(),
     });
   } catch (err) {
     // The rules still treat the old superadmin as superadmin, so the screen should too.
-    if (role === 'superadmin') return asProfile(u.uid, { ...fresh, role });
+    if (role === 'superadmin') return asProfile(u.uid, { ...fresh, providers, role });
     throw err;
   }
-  return asProfile(u.uid, { ...fresh, role, createdAt: new Date(), lastSignInAt: new Date() });
+  return asProfile(u.uid, { ...fresh, providers, role, createdAt: new Date(), lastSignInAt: new Date() });
 }
 
 export async function listUserProfiles(): Promise<UserProfile[]> {

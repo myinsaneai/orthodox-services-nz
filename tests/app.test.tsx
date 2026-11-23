@@ -32,7 +32,7 @@ import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 const fbUser = { uid: 'u1', email: 'admin@example.com' };
 const signIn = (u: any) => act(async () => { await h.cb!(u); });
 const profile = (role: string, parishIds: string[] = []) =>
-  ({ uid: 'u1', email: 'admin@example.com', displayName: '', photoURL: '', role, parishIds });
+  ({ uid: 'u1', email: 'admin@example.com', displayName: '', photoURL: '', role, parishIds, providers: ['google'] });
 const open = async (path: string, role: string | null, parishIds: string[] = []) => {
   h.profile = role ? profile(role, parishIds) : null;
   mountApp(path);
@@ -56,12 +56,12 @@ afterEach(cleanup);
 describe('public routes', () => {
   it('/ goes to Services', async () => {
     mountApp('/');
-    expect(await screen.findByRole('heading', { name: 'Services & Sacred Mysteries' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Services', level: 1 })).toBeTruthy();
     expect(window.location.pathname).toBe('/services');
   });
   it('an unknown address goes to Services too', async () => {
     mountApp('/no/such/page');
-    expect(await screen.findByRole('heading', { name: 'Services & Sacred Mysteries' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Services', level: 1 })).toBeTruthy();
   });
   it('Parishes and About open from the menu', async () => {
     mountApp('/services');
@@ -73,7 +73,7 @@ describe('public routes', () => {
   });
   it('public pages never load the admin area', async () => {
     mountApp('/services');
-    await screen.findByRole('heading', { name: 'Services & Sacred Mysteries' });
+    await screen.findByRole('heading', { name: 'Services', level: 1 });
     expect(h.cb).toBeNull();            // the auth listener only starts inside /admin
   });
 });
@@ -86,10 +86,20 @@ describe('admin area (My page)', () => {
     expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
     expect(window.location.pathname).toBe('/admin/login');
   });
-  it('a plain user is told there is no admin area for them yet', async () => {
+  it('a plain user who opens /admin ends up on the first page, not in an admin area', async () => {
     await open('/admin', 'user');
-    expect(await screen.findByText(/no admin area yet/)).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Services', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/services');
     expect(screen.queryByRole('heading', { name: 'My page' })).toBeNull();
+  });
+  it('after signing in on the sign-in page, everybody goes to the first page, not to My page', async () => {
+    for (const role of ['user', 'coordinator', 'admin', 'superadmin']) {
+      cleanup(); h.cb = null;
+      await open('/admin/login', role);
+      expect(await screen.findByRole('heading', { name: 'Services', level: 1 })).toBeTruthy();
+      expect(window.location.pathname).toBe('/services');
+      expect(screen.queryByRole('heading', { name: 'My page' })).toBeNull();
+    }
   });
   it('a coordinator reaches My page and sees how many parishes they manage', async () => {
     await open('/admin', 'coordinator', ['a', 'b']);

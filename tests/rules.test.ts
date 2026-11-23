@@ -62,7 +62,9 @@ describe('firestore.rules', () => {
     expect(b).toMatch(/request\.auth\.uid == uid && selfEditOk\(\)/);
     expect(b).toMatch(/request\.auth\.uid != uid && roleChangeOk\(\)/);
     // the self-edit may touch these fields and nothing else
-    expect(rules).toMatch(/hasOnly\(\['displayName', 'photoURL', 'email', 'lastSignInAt'\]\)/);
+    expect(rules).toMatch(/hasOnly\(\['displayName', 'photoURL', 'email', 'providers', 'lastSignInAt'\]\)/);
+    // how a person signs in is limited to google / password
+    expect(rules).toMatch(/hasOnly\(\['google', 'password'\]\)/);
     // a role change touches only role and parishIds
     expect(rules).toMatch(/hasOnly\(\['role', 'parishIds'\]\)/);
   });

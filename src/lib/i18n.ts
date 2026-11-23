@@ -9,7 +9,7 @@ const strings = {
   navServices:     { en: 'Services', el: 'Ακολουθίες' },
   navParishes:     { en: 'Parishes', el: 'Ενορίες' },
   navAbout:        { en: 'About', el: 'Σχετικά' },
-  servicesHeading: { en: 'Services & Sacred Mysteries', el: 'Ακολουθίες & Μυστήρια' },
+  servicesHeading: { en: 'Services', el: 'Ακολουθίες' },
   servicesSub:     { en: 'Upcoming across all parishes, or filter to one', el: 'Προσεχείς ακολουθίες σε όλες τις ενορίες ή φιλτράρετε μία' },
   allParishes:     { en: 'All parishes', el: 'Όλες οι ενορίες' },
   noServices:      { en: 'No upcoming services found.', el: 'Δεν βρέθηκαν προσεχείς ακολουθίες.' },

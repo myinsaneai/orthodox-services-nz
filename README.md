@@ -114,7 +114,7 @@ Firestore collections (all ids are the document ids; `slug` is the URL-safe name
 - `parishes/{id}`: `slug`, `nameEn`, `nameEl`, `city`, `address`, `groupIds[]`, `accentColor` (hex), `order`, `visible`
 - `groups/{id}`: `slug`, `nameEn`, `nameEl`, `order`
 - `services/{id}`: `parishId`, `date` (`YYYY-MM-DD`), `time` (`HH:mm`, 24 h), `titleEn`, `titleEl`, `notesEn`, `notesEl`, `updatedAt`
-- `users/{uid}`: `uid`, `email`, `displayName`, `photoURL`, `role` (`user` | `coordinator` | `admin` | `superadmin`), `parishIds` (list; only a coordinator has any), `createdAt`, `lastSignInAt`. Created by the person at first sign-in.
+- `users/{uid}`: `uid`, `email`, `displayName`, `photoURL`, `providers` (`google` / `password`: how they sign in, shown to admins), `role` (`user` | `coordinator` | `admin` | `superadmin`), `parishIds` (list; only a coordinator has any), `createdAt`, `lastSignInAt`. Created by the person at first sign-in.
 - `admins/{uid}`: retired, read-only; only used to carry the first superadmin over to `users/{uid}`.
 - `settings/site`: `siteNameEn`, `siteNameEl`
 
@@ -136,7 +136,7 @@ Security rules (`firestore.rules`): everything is publicly readable except `user
 8. **Launch and handover.** First superadmin, onboarding of coordinators.
 
 ### Testing
-- `npm test` (Vitest 5 + jsdom + Testing Library): 152 tests in 13 files. Firebase is always faked; no test touches the network or an emulator.
+- `npm test` (Vitest 5 + jsdom + Testing Library): 158 tests in 14 files. Firebase is always faked; no test touches the network or an emulator.
 - `tests/schedule.test.ts`: NZ date around daylight-saving changes, English/Greek date text, scope resolution, hidden parishes.
 - `tests/i18n.test.ts`: every string has real English and Greek text; the three agreed menu items.
 - `tests/rules.test.ts`: **static** checks of `firestore.rules` and `firestore.indexes.json` against the code (every collection has a rule, no open writes, writes tied to the parish, the indexes the queries need). They read the files; they do not run the rules.

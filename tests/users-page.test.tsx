@@ -19,7 +19,7 @@ vi.mock('../src/lib/firestore', () => ({
 import UsersPage from '../src/admin/UsersPage';
 
 const p = (uid: string, name: string, role: string, extra: any = {}) =>
-  ({ uid, email: `${uid}@example.com`, displayName: name, photoURL: '', role, parishIds: [], createdAt: 0, lastSignInAt: 0, ...extra });
+  ({ uid, email: `${uid}@example.com`, displayName: name, photoURL: '', role, parishIds: [], providers: ['google'], createdAt: 0, lastSignInAt: 0, ...extra });
 const as = (role: string, uid = 'me') => { h.auth = { user: { uid }, role }; };
 
 const rowOf = (name: string) => screen.getByText(name).closest('.um-row') as HTMLElement;
@@ -30,8 +30,9 @@ beforeEach(() => {
     p('me', 'Me Myself', 'superadmin'),
     p('ad', 'Alice Admin', 'admin'),
     p('co', 'Carl Coordinator', 'coordinator', { parishIds: ['a', 'b'] }),
-    p('u1', 'Ulla User', 'user'),
-    p('u2', 'Bob Builder', 'user'),
+    p('u1', 'Ulla User', 'user', { providers: ['password'] }),
+    p('u2', 'Bob Builder', 'user', { providers: ['google', 'password'] }),
+    p('u3', 'Old Profile', 'user', { providers: [] }),
   ];
   h.list.mockReset(); h.setRole.mockReset(); h.del.mockReset();
   h.list.mockImplementation(async () => h.users);
@@ -44,19 +45,19 @@ describe('Users page: list', () => {
     as('superadmin');
     await mount();
     const names = [...document.querySelectorAll('.um-name')].map(n => n.textContent);
-    expect(names).toEqual(['Me Myself', 'Alice Admin', 'Carl Coordinator', 'Bob Builder', 'Ulla User']);
-    expect(screen.getByText('5 of 5 users')).toBeTruthy();
+    expect(names).toEqual(['Me Myself', 'Alice Admin', 'Carl Coordinator', 'Bob Builder', 'Old Profile', 'Ulla User']);
+    expect(screen.getByText('6 of 6 users')).toBeTruthy();
   });
   it('searches by name or email and filters by role', async () => {
     as('superadmin');
     await mount();
     fireEvent.change(screen.getByLabelText('Search users'), { target: { value: 'bob' } });
-    expect(screen.getByText('1 of 5 users')).toBeTruthy();
+    expect(screen.getByText('1 of 6 users')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Search users'), { target: { value: 'u1@example' } });
     expect(screen.getByText('Ulla User')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Search users'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('Filter by role'), { target: { value: 'user' } });
-    expect(screen.getByText('2 of 5 users')).toBeTruthy();
+    expect(screen.getByText('3 of 6 users')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Search users'), { target: { value: 'zzz' } });
     expect(screen.getByText('No users match.')).toBeTruthy();
   });
@@ -75,6 +76,19 @@ describe('Users page: list', () => {
     const d = screen.getByText('What do the roles mean?').closest('details')!;
     ['User', 'Coordinator', 'Admin', 'SuperAdmin'].forEach(r =>
       expect(within(d).getByText(r, { selector: 'b' })).toBeTruthy());
+  });
+});
+
+describe('Users page: how each person signs in', () => {
+  it('shows Google, Email, both, or Unknown for every user', async () => {
+    as('admin', 'ad');
+    await mount();
+    const method = (n: string) => rowOf(n).textContent!;
+    expect(method('Me Myself')).toMatch(/Signs in with: Google/);
+    expect(method('Ulla User')).toMatch(/Signs in with: Email(?! \+)/);
+    expect(method('Bob Builder')).toMatch(/Signs in with: Email \+ Google/);
+    expect(method('Old Profile')).toMatch(/Signs in with: Unknown/);
+    expect(screen.getByText('Signs in with', { selector: '.um-head div' })).toBeTruthy();
   });
 });
 
@@ -164,7 +178,7 @@ describe('Users page: a superadmin', () => {
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(h.del).toHaveBeenCalledWith('u1'));
     await waitFor(() => expect(screen.queryByText('Ulla User')).toBeNull());
-    expect(screen.getByText('4 of 4 users')).toBeTruthy();
+    expect(screen.getByText('5 of 5 users')).toBeTruthy();
   });
   it('keeps the person in the list and shows a message if the delete fails', async () => {
     h.del.mockRejectedValue(new Error('offline'));

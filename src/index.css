@@ -103,7 +103,7 @@ a { color: inherit; }
 .um-btn:disabled { opacity: 0.6; cursor: default; }
 .um-muted { color: var(--color-muted); font-size: 13px; }
 .um-lab { display: none; }
-@media (max-width: 759px) { .um-lab { display: inline; } }
+@media (max-width: 919px) { .um-lab { display: inline; } }
 .um-roles { margin: 0 0 12px; font-size: 13px; color: var(--color-muted); }
 .um-roles summary { cursor: pointer; }
 .um-roles ul { margin: 6px 0 0; padding-left: 18px; }
@@ -127,12 +127,12 @@ a { color: inherit; }
 .um-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .um-confirm { grid-column: 1 / -1; background: #fbeceA; border: 1px solid #d9b3ac; border-radius: 4px; padding: 8px 10px; font-size: 13px; }
 .um-error { grid-column: 1 / -1; color: #a33a2b; font-size: 13px; margin: 0; }
-@media (min-width: 760px) {
-  .um-row { grid-template-columns: minmax(220px, 2fr) 150px 120px 1fr; }
-  .um-head { display: grid; gap: 8px 12px; grid-template-columns: minmax(220px, 2fr) 150px 120px 1fr;
+@media (min-width: 920px) {
+  .um-row { grid-template-columns: minmax(220px, 2fr) 130px 120px 120px 1fr; }
+  .um-head { display: grid; gap: 8px 12px; grid-template-columns: minmax(220px, 2fr) 130px 120px 120px 1fr;
     font-size: 12px; color: var(--color-muted); padding: 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
 }
-@media (max-width: 759px) { .um-head { display: none; } }
+@media (max-width: 919px) { .um-head { display: none; } }
 
 .hero { background: var(--color-cream); padding: 20px var(--gutter) 18px; text-align: center; }
 .hero h1 {

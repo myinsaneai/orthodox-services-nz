@@ -62,14 +62,21 @@ service cloud.firestore {
              request.resource.data.email == request.auth.token.get('email', '');
     }
 
+    // How the person signs in: only these two values, at most once each (nothing else is trusted from it).
+    function providersOk() {
+      return request.resource.data.get('providers', []) is list &&
+             request.resource.data.get('providers', []).size() <= 2 &&
+             request.resource.data.get('providers', []).hasOnly(['google', 'password']);
+    }
+
     // First sign-in: a person creates their own profile as a plain user. The old
     // admins/{uid} superadmin must create it as superadmin (so they are not demoted by accident).
     function newProfileOk() {
       return request.resource.data.keys().hasOnly(
-               ['uid', 'email', 'displayName', 'photoURL', 'role', 'parishIds', 'createdAt', 'lastSignInAt'])
+               ['uid', 'email', 'displayName', 'photoURL', 'providers', 'role', 'parishIds', 'createdAt', 'lastSignInAt'])
           && request.resource.data.keys().hasAll(['uid', 'email', 'role', 'parishIds', 'createdAt', 'lastSignInAt'])
           && request.resource.data.uid == request.auth.uid
-          && emailOk() && textOk('displayName', 200) && textOk('photoURL', 2000)
+          && emailOk() && textOk('displayName', 200) && textOk('photoURL', 2000) && providersOk()
           && request.resource.data.parishIds == []
           && request.resource.data.createdAt == request.time
           && request.resource.data.lastSignInAt == request.time
@@ -79,8 +86,8 @@ service cloud.firestore {
 
     // A person may refresh their own name, photo, email and last-sign-in time, never their role.
     function selfEditOk() {
-      return newKeys().hasOnly(['displayName', 'photoURL', 'email', 'lastSignInAt'])
-          && textOk('displayName', 200) && textOk('photoURL', 2000)
+      return newKeys().hasOnly(['displayName', 'photoURL', 'email', 'providers', 'lastSignInAt'])
+          && textOk('displayName', 200) && textOk('photoURL', 2000) && providersOk()
           && (!newKeys().hasAny(['email']) || emailOk())
           && (!newKeys().hasAny(['lastSignInAt']) || request.resource.data.lastSignInAt == request.time);
     }

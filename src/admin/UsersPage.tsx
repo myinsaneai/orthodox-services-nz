@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { listUserProfiles, setUserRole, deleteUserProfile, toMillis } from '../lib/firestore';
+import { signInLabel } from '../lib/signIn';
 import type { UserProfile } from '../lib/firestore';
 import { ROLES, ROLE_LABEL, rank, assignableRoles, canChangeRole, canDeleteUser } from '../lib/roles';
 import type { RoleName } from '../lib/roles';
@@ -80,7 +81,7 @@ export default function UsersPage() {
         {loadError && <p role="alert" className="um-error">{loadError}</p>}
 
         <div className="um-head" aria-hidden="true">
-          <div>User</div><div>Role</div><div>Last sign-in</div><div />
+          <div>User</div><div>Role</div><div>Signs in with</div><div>Last sign-in</div><div />
         </div>
         {shown.map(u => (
           <Row key={u.uid} u={u} myRole={myRole} myUid={myUid}
@@ -144,6 +145,7 @@ function Row({ u, myRole, myUid, onChanged, onDeleted }: {
             </select>
           : <span className={`um-tag um-tag--${u.role}`}>{ROLE_LABEL[u.role]}</span>}
       </div>
+      <div className="um-muted"><span className="um-lab">Signs in with: </span>{signInLabel(u.providers)}</div>
       <div className="um-muted"><span className="um-lab">Last sign-in: </span>{when(u.lastSignInAt)}</div>
       <div className="um-actions">
         {self ? <span className="um-muted">You</span>
