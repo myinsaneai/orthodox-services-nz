@@ -35,8 +35,8 @@ service cloud.firestore {
          parishId in get(myProfile()).data.parishIds);
     }
 
-    // Parishes: public read. An admin or superadmin adds a parish (create only, shape checked);
-    // changing or deleting one stays with the superadmin until the parish editor exists.
+    // Parishes: public read. An admin or superadmin adds, edits and deletes parishes (shape checked
+    // on every write; the slug, which links and the document name rely on, never changes).
     function reqStr(f, min, max) {
       return request.resource.data.get(f, null) is string &&
              request.resource.data.get(f, '').size() >= min && request.resource.data.get(f, '').size() <= max;
@@ -63,14 +63,15 @@ service cloud.firestore {
           && optStr('photoURL', 2000)
           && (request.resource.data.get('photoURL', '') == '' ||
               request.resource.data.get('photoURL', '').matches('https://firebasestorage[.]googleapis[.]com/.*'))
-          && request.resource.data.groupIds == []
+          && request.resource.data.groupIds is list && request.resource.data.groupIds.size() <= 50
           && request.resource.data.order is number
           && request.resource.data.visible is bool;
     }
     match /parishes/{id} {
       allow read: if true;
-      allow create: if isAdminUp() && parishOk(id);
-      allow update, delete: if isSuperAdmin();
+      allow create: if isAdminUp() && parishOk(id) && request.resource.data.groupIds == [];
+      allow update: if isAdminUp() && parishOk(id) && resource.data.slug == request.resource.data.slug;
+      allow delete: if isAdminUp();
     }
     // Public read; superadmin write (groups, site settings).
     match /groups/{id}    { allow read: if true; allow write: if isSuperAdmin(); }

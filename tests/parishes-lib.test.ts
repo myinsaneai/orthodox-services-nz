@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { PARISH_STATES, stateById } from '../src/lib/states';
 import { isMapUrl, safeMapUrl } from '../src/lib/mapUrl';
-import { emptyParishForm, checkParishForm, slugify, uniqueSlug, buildParish } from '../src/lib/parishes';
+import { emptyParishForm, checkParishForm, slugify, uniqueSlug, buildParish, formFromParish, buildParishUpdate } from '../src/lib/parishes';
 import type { ParishForm } from '../src/lib/parishes';
 
 const form = (over: Partial<ParishForm> = {}): ParishForm => ({
@@ -90,6 +90,33 @@ describe('ids and the new record', () => {
   });
   it('the first parish gets order 1', () => {
     expect(buildParish(form(), '', []).order).toBe(1);
+  });
+});
+
+describe('editing', () => {
+  const old = {
+    id: 'st-john-suva', slug: 'st-john-suva', state: 'fj', nameEn: 'St John', nameEl: 'Άγιος Ιωάννης', city: 'Suva', cityEl: 'Σούβα',
+    address: '12 Victoria Pde', descriptionEn: 'Small.', descriptionEl: 'Μικρή.', mapUrl: '', photoURL: 'https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg',
+    groupIds: ['g1'], accentColor: '#123', order: 7, visible: false,
+  };
+  it('formFromParish fills the form, and copes with an older parish that lacks the new fields', () => {
+    expect(formFromParish(old)).toEqual({
+      state: 'fj', nameEn: 'St John', nameEl: 'Άγιος Ιωάννης', cityEn: 'Suva', cityEl: 'Σούβα',
+      descriptionEn: 'Small.', descriptionEl: 'Μικρή.', address: '12 Victoria Pde', mapUrl: '',
+    });
+    const bare = formFromParish({ id: 'x', slug: 'x', nameEn: 'A', nameEl: 'Α', city: 'B', address: '', groupIds: [], accentColor: '', order: 1, visible: true });
+    expect(bare.cityEl).toBe(''); expect(bare.state).toBe('');
+  });
+  it('buildParishUpdate takes the form but keeps id, slug, order, visibility, groups and colour', () => {
+    const f = { ...formFromParish(old), nameEn: ' St John the Baptist ', state: 'ws' };
+    expect(buildParishUpdate(f, '', old)).toEqual({ ...old, nameEn: 'St John the Baptist', state: 'ws', photoURL: '' });
+  });
+  it('an edit writes only fields the rules allow', () => {
+    const rules = readFileSync('firestore.rules', 'utf8');
+    const fn = rules.slice(rules.indexOf('function parishOk'), rules.indexOf('match /parishes/'));
+    const allowed = [...fn.match(/hasOnly\(\s*\[([^\]]*)\]/)![1].matchAll(/'(\w+)'/g)].map(m => m[1]);
+    const { id: _id, ...data } = buildParishUpdate(formFromParish(old), old.photoURL, old);
+    expect(Object.keys(data).filter(k => !allowed.includes(k))).toEqual([]);
   });
 });
 

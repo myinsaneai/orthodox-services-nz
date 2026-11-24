@@ -56,6 +56,26 @@ export function uniqueSlug(nameEn: string, cityEn: string, taken: string[], fall
   return slug;
 }
 
+/** The form filled in from an existing parish (editing). */
+export function formFromParish(p: Parish): ParishForm {
+  return {
+    state: p.state ?? '', nameEn: p.nameEn ?? '', nameEl: p.nameEl ?? '', cityEn: p.city ?? '', cityEl: p.cityEl ?? '',
+    descriptionEn: p.descriptionEn ?? '', descriptionEl: p.descriptionEl ?? '', address: p.address ?? '', mapUrl: p.mapUrl ?? '',
+  };
+}
+
+/** The edited parish: what the form holds, with id, address-friendly name, order, visibility and groups kept as they were. */
+export function buildParishUpdate(f: ParishForm, photoURL: string, old: Parish): Parish {
+  return {
+    id: old.id, slug: old.slug, state: f.state,
+    nameEn: f.nameEn.trim(), nameEl: f.nameEl.trim(),
+    city: f.cityEn.trim(), cityEl: f.cityEl.trim(), address: f.address.trim(),
+    descriptionEn: f.descriptionEn.trim(), descriptionEl: f.descriptionEl.trim(),
+    mapUrl: f.mapUrl.trim(), photoURL,
+    groupIds: old.groupIds ?? [], accentColor: old.accentColor ?? '', order: old.order, visible: old.visible,
+  };
+}
+
 /** The record to save. `existing` are the parishes already there (for the id and the order). */
 export function buildParish(f: ParishForm, photoURL: string, existing: Pick<Parish, 'slug' | 'id' | 'order'>[]): Parish {
   const slug = uniqueSlug(f.nameEn, f.cityEn, existing.flatMap(p => [p.slug, p.id]));

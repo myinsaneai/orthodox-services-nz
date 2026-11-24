@@ -14,6 +14,8 @@ const strings = {
   allParishes:     { en: 'All parishes', el: 'Όλες οι ενορίες' },
   noServices:      { en: 'No upcoming services found.', el: 'Δεν βρέθηκαν προσεχείς ακολουθίες.' },
   parishesHeading: { en: 'Parishes', el: 'Ενορίες' },
+  addParish:       { en: 'Add parish', el: 'Προσθήκη ενορίας' },
+  editParish:      { en: 'Edit', el: 'Επεξεργασία' },
   viewMap:         { en: 'View on map', el: 'Δείτε στον χάρτη' },
   aboutHeading:    { en: 'About', el: 'Σχετικά' },
   loading:         { en: 'Loading…', el: 'Φόρτωση…' },

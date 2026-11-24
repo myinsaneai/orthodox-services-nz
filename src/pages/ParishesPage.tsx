@@ -8,6 +8,8 @@ import { t } from '../lib/i18n';
 import { subscribeParishes } from '../lib/firestore';
 import type { Parish } from '../lib/firestore';
 import { DEFAULT_PARISH_ACCENT } from '../themes/tokens';
+import { useRoleHint } from '../hooks/useRoleHint';
+import { isAtLeast } from '../lib/roles';
 import { stateById } from '../lib/states';
 import { safeMapUrl } from '../lib/mapUrl';
 import { safePhotoUrl } from '../lib/photoUrl';
@@ -17,11 +19,18 @@ export default function ParishesPage() {
   const [parishes, setParishes] = useState<Parish[]>([]);
 
   useEffect(() => subscribeParishes(setParishes), []);
+  // Admin buttons: shown from the stored role hint (display only; the Firestore rules decide who may write).
+  const canManage = isAtLeast(useRoleHint(), 'admin');
 
   return (
     <>
       <div className="hero">
         <h1>{t('parishesHeading', lang)}</h1>
+        {canManage && (
+          <div className="hero-actions">
+            <Link to="/admin/parishes/new" className="btn-add">{t('addParish', lang)}</Link>
+          </div>
+        )}
       </div>
 
       <div className="page cards-grid cards-grid--parishes">
@@ -50,6 +59,9 @@ export default function ParishesPage() {
               </Link>
               {description && <div className="pc-desc">{description}</div>}
               {p.address && <div className="pc-addr">{p.address}</div>}
+              {canManage && (
+                <div><Link className="pc-edit" to={`/admin/parishes/${encodeURIComponent(p.id)}`}>{t('editParish', lang)}</Link></div>
+              )}
               {map && (
                 <a className="pc-map" href={map} target="_blank" rel="noopener noreferrer">{t('viewMap', lang)}</a>
               )}

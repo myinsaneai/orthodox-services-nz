@@ -30,7 +30,12 @@ export default function AdminApp() {
           <Route path="profile" element={
             <AuthGuard><SiteLayout><ProfilePage /></SiteLayout></AuthGuard>
           } />
-          <Route path="parishes" element={
+          {/* Parishes are added and edited from the public Parishes page (admins see the buttons there). */}
+          <Route path="parishes" element={<Navigate to="/parishes" replace />} />
+          <Route path="parishes/new" element={
+            <AuthGuard minRole="admin"><SiteLayout><ParishesAdminPage /></SiteLayout></AuthGuard>
+          } />
+          <Route path="parishes/:id" element={
             <AuthGuard minRole="admin"><SiteLayout><ParishesAdminPage /></SiteLayout></AuthGuard>
           } />
           <Route path="users" element={

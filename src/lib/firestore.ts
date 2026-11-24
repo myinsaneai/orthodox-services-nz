@@ -11,7 +11,7 @@
 
 import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot,
-  query, orderBy, where, serverTimestamp, updateDoc, limit,
+  query, orderBy, where, serverTimestamp, updateDoc, limit, writeBatch,
 } from 'firebase/firestore';
 import type { Unsubscribe } from 'firebase/firestore';
 import { db } from './firebase';
@@ -101,6 +101,21 @@ export async function saveParish(p: Parish) {
 export async function createParish(p: Parish) {
   const { id, ...data } = p;                 // the id is the document name, not a field (the rules allow no extra fields)
   await setDoc(doc(db, 'parishes', id), data);
+}
+/** Saves changes to an existing parish (admins). The whole record is replaced; the id stays the name. */
+export async function updateParish(p: Parish) {
+  const { id, ...data } = p;
+  await setDoc(doc(db, 'parishes', id), data);
+}
+/** Deletes a parish and every service that belongs to it (services first, so none is left pointing at nothing). */
+export async function deleteParishAndServices(id: string) {
+  const snap = await getDocs(query(collection(db, 'services'), where('parishId', '==', id)));
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = writeBatch(db);
+    snap.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+  await deleteDoc(doc(db, 'parishes', id));
 }
 export async function deleteParish(id: string) {
   await deleteDoc(doc(db, 'parishes', id));

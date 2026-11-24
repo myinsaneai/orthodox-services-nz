@@ -3,7 +3,8 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-const h = vi.hoisted(() => ({ parishes: [] as any[] }));
+const h = vi.hoisted(() => ({ parishes: [] as any[], role: null as string | null }));
+vi.mock('../src/hooks/useRoleHint', () => ({ useRoleHint: () => h.role }));
 vi.mock('../src/lib/firestore', () => ({
   subscribeParishes: (cb: (p: any[]) => void) => { cb(h.parishes); return () => {}; },
 }));
@@ -14,6 +15,7 @@ import ParishesPage from '../src/pages/ParishesPage';
 const mount = () => render(<MemoryRouter><LangProvider><ParishesPage /></LangProvider></MemoryRouter>);
 
 beforeEach(() => {
+  h.role = null;
   localStorage.clear();
   Object.defineProperty(navigator, 'language', { value: 'en-NZ', configurable: true });
   h.parishes = [
@@ -95,6 +97,29 @@ describe('Parishes page', () => {
       mount();
       expect(screen.getByRole('link', { name: /St John/ }).getAttribute('href')).toBe('/services?parish=st-john');
       expect(screen.getByRole('link', { name: /St John/ }).querySelector('a')).toBeNull();
+    });
+  });
+
+  describe('admin buttons', () => {
+    it.each(['admin', 'superadmin'])('a %s sees "Add parish" and an Edit link on every parish', role => {
+      h.role = role;
+      mount();
+      expect(screen.getByRole('link', { name: 'Add parish' }).getAttribute('href')).toBe('/admin/parishes/new');
+      const edits = screen.getAllByRole('link', { name: 'Edit' });
+      expect(edits.map(a => a.getAttribute('href'))).toEqual(['/admin/parishes/a', '/admin/parishes/c']);   // visible parishes only
+    });
+    it.each([null, 'user', 'coordinator'])('%s sees no admin buttons', role => {
+      h.role = role;
+      mount();
+      expect(screen.queryByRole('link', { name: 'Add parish' })).toBeNull();
+      expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull();
+    });
+    it('the buttons are in Greek on the Greek site', () => {
+      h.role = 'admin';
+      localStorage.setItem('gp_lang', 'el');
+      mount();
+      expect(screen.getByRole('link', { name: 'Προσθήκη ενορίας' })).toBeTruthy();
+      expect(screen.getAllByRole('link', { name: 'Επεξεργασία' })).toHaveLength(2);
     });
   });
 });

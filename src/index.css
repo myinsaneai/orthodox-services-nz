@@ -222,3 +222,12 @@ a { color: inherit; }
 .pc-desc { font-size: 13px; margin-top: 6px; white-space: pre-line; overflow-wrap: anywhere; }
 .pc-addr { font-size: 13px; margin-top: 6px; color: var(--color-muted); overflow-wrap: anywhere; }
 .pc-map { display: inline-block; font-size: 13px; margin-top: 6px; }
+
+.hero-actions { margin-top: 10px; }
+.btn-add, .pc-edit {
+  display: inline-block; font-size: 13px; text-decoration: none; padding: 6px 12px; border-radius: 4px;
+  border: 1px solid var(--color-primary); color: var(--color-primary); background: #fff;
+}
+.btn-add { background: var(--color-primary); color: var(--color-cream); font-size: 14px; padding: 8px 16px; }
+.pc-edit { margin-top: 8px; }
+.btn-add:hover, .pc-edit:hover { filter: brightness(0.95); }

@@ -41,11 +41,13 @@ describe('firestore.rules', () => {
       expect(b, c).toMatch(/allow write: if isSuperAdmin\(\)/);
     });
   });
-  it('parishes: public read; an admin may create (shape checked); change and delete stay with the superadmin', () => {
+  it('parishes: public read; an admin or superadmin may create, edit and delete (shape checked, slug never changes)', () => {
     const b = block('parishes');
     expect(b).toMatch(/allow read: if true/);
-    expect(b).toMatch(/allow create: if isAdminUp\(\) && parishOk\(id\)/);
-    expect(b).toMatch(/allow update, delete: if isSuperAdmin\(\)/);
+    expect(b).toMatch(/allow create: if isAdminUp\(\) && parishOk\(id\) && request\.resource\.data\.groupIds == \[\]/);
+    expect(b).toMatch(/allow update: if isAdminUp\(\) && parishOk\(id\) && resource\.data\.slug == request\.resource\.data\.slug/);
+    expect(b).toMatch(/allow delete: if isAdminUp\(\)/);
+    expect(b).not.toMatch(/isSuperAdmin/);
     expect(b).not.toMatch(/allow write/);
   });
   it('a new parish: only known fields, the id equals the slug, Greek and English names and city required', () => {
@@ -54,7 +56,7 @@ describe('firestore.rules', () => {
     expect(fn).toMatch(/keys\(\)\.hasAll\(\s*\['slug', 'nameEn', 'nameEl', 'state', 'city', 'cityEl', 'address'/);
     expect(fn).toMatch(/request\.resource\.data\.slug == id/);
     ['nameEn', 'nameEl', 'city', 'cityEl', 'address'].forEach(f => expect(fn).toContain(`reqStr('${f}', 1,`));
-    expect(fn).toMatch(/groupIds == \[\]/);
+    expect(fn).toMatch(/groupIds is list/);
   });
   it('a parish location is a Google Maps link and a parish photo is from our Storage; same pattern as the app', () => {
     expect(rules).toContain(MAP_URL_PATTERN);

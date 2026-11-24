@@ -1,32 +1,43 @@
 // src/admin/ParishesAdminPage.tsx
-// My page → Parishes (admins): add a parish and see the ones that exist. Every text field has an
-// English and a Greek version. The photo is optional: shrunk in the browser (longest side at most
-// 1024 px), stored in Firebase Storage on Save, its address saved on the parish.
+// Add or edit a parish (admins), reached from the Parishes page: /admin/parishes/new and
+// /admin/parishes/<id>. Every text field has an English and a Greek version. The photo is
+// optional: shrunk in the browser (longest side at most 1024 px), stored in Firebase Storage
+// on Save, its address saved on the parish. Editing also offers "Delete parish".
 
 import { useEffect, useRef, useState } from 'react';
-import { subscribeParishes, createParish } from '../lib/firestore';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { subscribeParishes, createParish, updateParish, deleteParishAndServices } from '../lib/firestore';
 import type { Parish } from '../lib/firestore';
-import { PARISH_STATES, stateById } from '../lib/states';
+import { PARISH_STATES } from '../lib/states';
 import { checkImageFile, resizeImage } from '../lib/image';
-import { emptyParishForm, checkParishForm, buildParish, LIMITS } from '../lib/parishes';
+import { safePhotoUrl } from '../lib/photoUrl';
+import { emptyParishForm, formFromParish, checkParishForm, buildParish, buildParishUpdate, LIMITS } from '../lib/parishes';
 import type { ParishForm } from '../lib/parishes';
 import AvatarDropzone from './AvatarDropzone';
-import { uploadParishPhoto, removeParishPhoto } from './parishStorage';
+import { uploadParishPhoto, removeParishPhoto, removeParishPhotos } from './parishStorage';
 
 const kb = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 export default function ParishesAdminPage() {
+  const { id } = useParams();                       // no id: a new parish
+  const editing = !!id && id !== 'new';
+  const navigate = useNavigate();
   const [parishes, setParishes] = useState<Parish[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [form, setForm] = useState<ParishForm>(emptyParishForm);
+  const [edits, setEdits] = useState<Partial<ParishForm>>({});   // what the person has typed so far
   const [photo, setPhoto] = useState<{ blob: Blob; url: string; width: number; height: number } | null>(null);
+  const [removed, setRemoved] = useState(false);     // editing: the current photo will be removed
   const [working, setWorking] = useState(false);     // shrinking the picture
-  const [busy, setBusy] = useState(false);           // saving
+  const [busy, setBusy] = useState(false);           // saving or deleting
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState('');
   const urlRef = useRef('');
 
   useEffect(() => subscribeParishes(p => { setParishes(p); setLoaded(true); }), []);
+  const current = editing ? parishes.find(p => p.id === id) : undefined;
+
+  // The form is the parish being edited (or an empty form) with the person's typing on top.
+  const form: ParishForm = { ...(current ? formFromParish(current) : emptyParishForm()), ...edits };
 
   // Release the preview address when it is replaced and when leaving the page.
   useEffect(() => {
@@ -36,87 +47,109 @@ export default function ParishesAdminPage() {
   }, [photo]);
   useEffect(() => () => { if (urlRef.current) URL.revokeObjectURL(urlRef.current); }, []);
 
-  const set = (k: keyof ParishForm) => (e: { target: { value: string } }) => {
-    setForm(f => ({ ...f, [k]: e.target.value })); setDone('');
-  };
+  const set = (k: keyof ParishForm) => (e: { target: { value: string } }) => setEdits(x => ({ ...x, [k]: e.target.value }));
 
   const pick = async (file: File) => {
-    setDone('');
     const problem = checkImageFile(file);
     if (problem) { setError(problem); return; }
     setError(''); setWorking(true);
     try {
       const out = await resizeImage(file);
       setPhoto({ blob: out.blob, url: URL.createObjectURL(out.blob), width: out.width, height: out.height });
+      setRemoved(false);
     } catch {
       setError('We could not read that picture. Please try a different one.');
     }
     setWorking(false);
   };
 
+  const fail = (err: unknown) => {
+    const code = (err as { code?: string })?.code ?? '';
+    setError(code.startsWith('storage/')
+      ? 'The photo could not be uploaded. Check your connection and try again.'
+      : code === 'permission-denied'
+        ? 'You are not allowed to do that.'
+        : 'Could not save. Check your connection and try again.');
+    setBusy(false);
+  };
+
   const save = async () => {
     const problem = checkParishForm(form);
     if (problem) { setError(problem); return; }
-    setBusy(true); setError(''); setDone('');
+    setBusy(true); setError('');
     let uploaded = '';
     try {
-      const parish = buildParish(form, '', parishes);
+      const parish = editing && current ? buildParishUpdate(form, current.photoURL ?? '', current) : buildParish(form, '', parishes);
       if (photo) { uploaded = await uploadParishPhoto(parish.id, photo.blob); parish.photoURL = uploaded; }
+      else if (removed) parish.photoURL = '';
       try {
-        await createParish(parish);
+        await (editing ? updateParish(parish) : createParish(parish));
       } catch (err) {
         if (uploaded) await removeParishPhoto(uploaded);       // do not leave a picture with no parish
         throw err;
       }
-      setDone(`Parish "${parish.nameEn}" added.`);
-      setForm(emptyParishForm()); setPhoto(null);
-    } catch (err) {
-      const code = (err as { code?: string })?.code ?? '';
-      setError(code.startsWith('storage/')
-        ? 'The photo could not be uploaded. Check your connection and try again.'
-        : code === 'permission-denied'
-          ? 'You are not allowed to add parishes.'
-          : 'Could not save. Check your connection and try again.');
-    }
-    setBusy(false);
+      if (editing && (photo || removed)) await removeParishPhotos(parish.id, parish.photoURL);   // tidy the old files
+      navigate('/parishes');
+    } catch (err) { fail(err); }
   };
 
-  const text = (id: string, label: string, k: keyof ParishForm, max: number, lang?: string) => (
-    <label className="pf-field" htmlFor={id}>
+  const remove = async () => {
+    if (!current) return;
+    setBusy(true); setError('');
+    try {
+      await deleteParishAndServices(current.id);
+      await removeParishPhotos(current.id);
+      navigate('/parishes');
+    } catch (err) { fail(err); setConfirming(false); }
+  };
+
+  if (editing && loaded && !current) {
+    return (
+      <>
+        <div className="hero"><h1>Parish not found</h1></div>
+        <div className="page"><p>This parish no longer exists. <Link to="/parishes">Back to Parishes</Link></p></div>
+      </>
+    );
+  }
+
+  const shownPhoto = photo ? photo.url : removed ? '' : safePhotoUrl(current?.photoURL);
+
+  const text = (fid: string, label: string, k: keyof ParishForm, max: number, lang?: string) => (
+    <label className="pf-field" htmlFor={fid}>
       <span>{label}</span>
-      <input id={id} type="text" value={form[k]} maxLength={max} lang={lang} onChange={set(k)} />
+      <input id={fid} type="text" value={form[k]} maxLength={max} lang={lang} onChange={set(k)} />
     </label>
   );
-  const area = (id: string, label: string, k: keyof ParishForm, lang: string) => (
-    <label className="pf-field" htmlFor={id}>
+  const area = (fid: string, label: string, k: keyof ParishForm, lang: string) => (
+    <label className="pf-field" htmlFor={fid}>
       <span>{label}</span>
-      <textarea id={id} rows={5} value={form[k]} maxLength={LIMITS.description} lang={lang} onChange={set(k)} />
+      <textarea id={fid} rows={5} value={form[k]} maxLength={LIMITS.description} lang={lang} onChange={set(k)} />
     </label>
   );
 
   return (
     <>
       <div className="hero">
-        <h1>Parishes</h1>
-        <div className="hero-sub">Add a parish. Names, cities and descriptions are kept in English and Greek.</div>
+        <h1>{editing ? 'Edit parish' : 'Add a parish'}</h1>
+        <div className="hero-sub">Names, cities and descriptions are kept in English and Greek.</div>
       </div>
       <div className="page pa">
-        <section className="pa-form" aria-labelledby="pa-new">
-          <h2 id="pa-new">New parish</h2>
-
+        <section className="pa-form">
           <div className="pa-photo">
-            {photo && <img className="pa-photo-img" src={photo.url} alt="Parish photo preview" />}
+            {shownPhoto && <img className="pa-photo-img" src={shownPhoto} alt="Parish photo" />}
             <div className="pf-drop">
               <AvatarDropzone onFile={pick} disabled={busy || working} />
               {working && <p className="um-muted" role="status">Preparing the picture…</p>}
               {photo && !working && (
-                <>
-                  <p className="um-muted" role="status">
-                    Photo ready: {photo.width} × {photo.height} px, {kb(photo.blob.size)}. It is saved with the parish.
-                  </p>
-                  <button type="button" className="um-btn" disabled={busy} onClick={() => setPhoto(null)}>Remove photo</button>
-                </>
+                <p className="um-muted" role="status">
+                  Photo ready: {photo.width} × {photo.height} px, {kb(photo.blob.size)}. It is saved with the parish.
+                </p>
               )}
+              {(photo || (editing && current?.photoURL && !removed)) && (
+                <button type="button" className="um-btn" disabled={busy}
+                        onClick={() => { setPhoto(null); setRemoved(true); }}>Remove photo</button>
+              )}
+              {removed && <p className="um-muted" role="status">The photo will be removed when you press Save.</p>}
               <p className="um-muted">The photo is optional.</p>
             </div>
           </div>
@@ -149,34 +182,32 @@ export default function ParishesAdminPage() {
           </label>
 
           {error && <p role="alert" className="um-error">{error}</p>}
-          {done && <p role="status" className="um-muted">{done}</p>}
           <div className="um-actions">
-            <button type="button" className="um-btn um-btn--primary" disabled={busy || working} onClick={save}>
-              {busy ? 'Saving…' : 'Add parish'}
+            <button type="button" className="um-btn um-btn--primary" disabled={busy || working || (editing && !current)} onClick={save}>
+              {busy && !confirming ? 'Saving…' : editing ? 'Save changes' : 'Add parish'}
             </button>
+            <Link to="/parishes" className="um-btn" aria-disabled={busy}>Cancel</Link>
+            {editing && current && !confirming && (
+              <button type="button" className="um-btn um-btn--danger" disabled={busy} onClick={() => setConfirming(true)}>
+                Delete parish
+              </button>
+            )}
           </div>
-        </section>
 
-        <section aria-labelledby="pa-list">
-          <h2 id="pa-list">Parishes ({parishes.length})</h2>
-          {loaded && parishes.length === 0 && <p className="um-muted">No parishes yet.</p>}
-          <ul className="pa-list">
-            {parishes.map(p => (
-              <li key={p.id}>
-                {p.photoURL
-                  ? <img className="pa-thumb" src={p.photoURL} alt="" />
-                  : <span className="pa-thumb pa-thumb--empty" aria-hidden="true" />}
-                <div>
-                  <strong>{p.nameEn}</strong>
-                  <span className="pa-sub">{p.nameEl}</span>
-                  <span className="pa-sub">
-                    {[p.city, stateById(p.state)?.nameEn].filter(Boolean).join(', ')}
-                  </span>
-                  {p.address && <span className="pa-sub pa-addr">{p.address}</span>}
-                </div>
-              </li>
-            ))}
-          </ul>
+          {confirming && current && (
+            <div className="um-confirm" role="alertdialog" aria-label="Confirm delete">
+              <p>
+                Delete <strong>{current.nameEn}</strong>? Its photo and <strong>all of its services</strong> are deleted
+                too. This cannot be undone.
+              </p>
+              <div className="um-actions">
+                <button type="button" className="um-btn um-btn--danger" disabled={busy} onClick={remove}>
+                  {busy ? 'Deleting…' : 'Yes, delete this parish'}
+                </button>
+                <button type="button" className="um-btn" disabled={busy} onClick={() => setConfirming(false)}>Keep it</button>
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </>
