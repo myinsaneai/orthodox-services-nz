@@ -86,7 +86,7 @@ describe('admin area (My page)', () => {
     mountApp('/admin');
     await waitFor(() => expect(h.cb).not.toBeNull());
     await signIn(null);
-    expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'User login' })).toBeTruthy();
     expect(window.location.pathname).toBe('/admin/login');
   });
   it('a plain user who opens /admin lands on their Profile', async () => {
@@ -148,7 +148,7 @@ describe('admin area (My page)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
     await waitFor(() => expect(h.signedOut).toBe(1));
     await signIn(null);                  // Firebase reports the sign-out
-    expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'User login' })).toBeTruthy();
   });
 });
 

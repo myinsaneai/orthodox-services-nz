@@ -9,6 +9,7 @@ import type { User } from 'firebase/auth';
 import { ensureUserProfile } from '../lib/firestore';
 import type { UserProfile } from '../lib/firestore';
 import { auth } from '../lib/firebaseAdmin';
+import { takePendingName } from '../admin/pendingName';
 import { setRoleHint } from '../lib/authHint';
 import { isAtLeast } from '../lib/roles';
 import type { RoleName } from '../lib/roles';
@@ -43,7 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       let next: UserProfile | null = null;
       if (firebaseUser) {
-        try { next = await ensureUserProfile(firebaseUser); } catch { /* role stays null */ }
+        try {
+          // A person who has just registered: their name is not on the account yet.
+          const displayName = firebaseUser.displayName || takePendingName() || null;
+          next = await ensureUserProfile({
+            uid: firebaseUser.uid, email: firebaseUser.email, displayName,
+            photoURL: firebaseUser.photoURL, providerData: firebaseUser.providerData,
+          });
+        } catch { /* role stays null */ }
       }
       setProfile(next);
       setRoleHint(next ? next.role : null);   // display hint for the public header

@@ -37,7 +37,7 @@ Repo: https://github.com/myinsaneai/orthodox-services-nz. Organised like the aut
 
 Nobody can change or delete their own role. The table lives in `src/lib/roles.ts` and, for the server, in `firestore.rules`.
 
-This extends the Russian parish site's single `admins/{uid}` + `sections` pattern: the delegated scope is now a list of **parishes** instead of a list of sections. Sign-in is Google or email + password (Firebase Auth). There is no sign-up page; a Google sign-in can create an Auth user for any Google account, but that person simply becomes a **user** and appears on My page → Users, where an admin can give them a role. The header has a Log in / Log out button next to the menu; every signed-in person also gets a **My page** menu entry with a second line of sections: Profile (name and photo, photo shrunk to 1024 px) for everyone, Users for admins and superadmins, more later.
+This extends the Russian parish site's single `admins/{uid}` + `sections` pattern: the delegated scope is now a list of **parishes** instead of a list of sections. Sign-in is Google or email + password (Firebase Auth). New email + password people register themselves on a short screen reached from the login form (confirm password, enter name); there is no separate sign-up page in the menu; a Google sign-in can create an Auth user for any Google account, but that person simply becomes a **user** and appears on My page → Users, where an admin can give them a role. The header has a Log in / Log out button next to the menu; every signed-in person also gets a **My page** menu entry with a second line of sections: Profile (name and photo, photo shrunk to 1024 px) for everyone, Users for admins and superadmins, more later.
 
 ## Requirements
 
@@ -136,7 +136,7 @@ Security rules (`firestore.rules`): everything is publicly readable except `user
 8. **Launch and handover.** First superadmin, onboarding of coordinators.
 
 ### Testing
-- `npm test` (Vitest 5 + jsdom + Testing Library): 185 tests in 16 files. Firebase is always faked; no test touches the network or an emulator.
+- `npm test` (Vitest 5 + jsdom + Testing Library): 213 tests in 18 files. Firebase is always faked; no test touches the network or an emulator.
 - `tests/schedule.test.ts`: NZ date around daylight-saving changes, English/Greek date text, scope resolution, hidden parishes.
 - `tests/i18n.test.ts`: every string has real English and Greek text; the three agreed menu items.
 - `tests/rules.test.ts`: **static** checks of `firestore.rules` and `firestore.indexes.json` against the code (every collection has a rule, no open writes, writes tied to the parish, the indexes the queries need). They read the files; they do not run the rules.

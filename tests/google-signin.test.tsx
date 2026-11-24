@@ -46,7 +46,7 @@ afterEach(() => { cleanup(); vi.unstubAllEnvs(); delete (window as any).google; 
 describe('Google button', () => {
   it('is on the sign-in page next to the email form', () => {
     mount();
-    expect(screen.getByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'User login' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeTruthy();
     expect(screen.getByPlaceholderText('Email')).toBeTruthy();
   });
@@ -113,7 +113,7 @@ describe('after signing in', () => {
   it('says so, with a way out, when the profile could not be loaded', () => {
     h.auth = { user: { email: 'stranger@example.com' }, role: null, loading: false };
     mount();
-    expect(screen.getByRole('heading', { name: 'Admin sign in' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'User login' })).toBeTruthy();
     expect(screen.getByText('stranger@example.com')).toBeTruthy();
     expect(screen.getByText(/could not load your account/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Go to the site' })).toBeTruthy();
@@ -125,7 +125,7 @@ describe('after signing in', () => {
     ['user', 'coordinator', 'admin', 'superadmin'].forEach(role => {
       h.auth = { user: { email: 'a@b.c' }, role, loading: false };
       const { container } = mount();
-      expect(container.textContent).not.toMatch(/Admin sign in/);
+      expect(container.textContent).not.toMatch(/User login/);
       cleanup();
     });
   });

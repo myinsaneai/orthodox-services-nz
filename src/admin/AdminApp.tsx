@@ -10,6 +10,7 @@ import AuthGuard from '../components/AuthGuard';
 import SiteLayout from '../components/SiteLayout';
 
 const LoginPage      = lazy(() => import('./LoginPage'));
+const RegisterPage   = lazy(() => import('./RegisterPage'));
 const ProfilePage    = lazy(() => import('./ProfilePage'));
 const UsersPage      = lazy(() => import('./UsersPage'));
 
@@ -23,6 +24,7 @@ export default function AdminApp() {
       <Suspense fallback={loadingFallback}>
         <Routes>
           <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
           <Route index element={<Navigate to="profile" replace />} />
           <Route path="profile" element={
             <AuthGuard><SiteLayout><ProfilePage /></SiteLayout></AuthGuard>

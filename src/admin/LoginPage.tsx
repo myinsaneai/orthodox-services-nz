@@ -1,5 +1,7 @@
 // src/admin/LoginPage.tsx
-// Sign-in: Google or email + password. Anyone can complete a Google sign-in; they
+// User login: Google or email + password. An email with no matching account goes on to
+// the registration screen (RegisterPage).
+// Anyone can complete a Google sign-in; they
 // get a plain "user" profile (so an admin can then find them on the Users page and
 // give them a role). After signing in everybody goes to the first page; the notice
 // below appears only when the profile could not be loaded. The Firestore rules
@@ -7,12 +9,14 @@
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebaseAdmin';
 import { useAuth } from '../contexts/AuthContext';
 import { signInWithGoogle, preloadGis, isGoogleCancel, googleErrorMessage } from './googleSignIn';
 import { embeddedBrowser } from './embeddedBrowser';
+import { checkEmailExists, isRateLimited } from './emailCheck';
+import type { EmailAnswer } from './emailCheck';
 
 const input: React.CSSProperties = {
   width: '100%', padding: '9px 10px', marginBottom: 12, fontSize: 14,
@@ -34,6 +38,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
   const kind = embeddedBrowser(typeof navigator === 'undefined' ? '' : navigator.userAgent);
 
   // Fetch Google's script now, so the Google window can open straight from the tap.
@@ -46,10 +51,46 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError('');
+    // 1. Is this email known? (the server answers yes/no for this one email only)
+    let known: EmailAnswer | null = null;
+    try {
+      known = await checkEmailExists(email);
+    } catch (err) {
+      if (isRateLimited(err)) {
+        setError('Too many attempts. Please wait a few minutes and try again.');
+        setBusy(false);
+        return;
+      }
+      // Check unavailable: carry on without it (handled below).
+    }
+    if (known && !known.exists) {                    // new person: registration
+      setBusy(false);
+      navigate('/admin/register', { state: { email, password } });
+      return;
+    }
+    if (known && known.providers.length > 0 && !known.providers.includes('password')) {
+      setError('This email signs in with Google. Please use the "Continue with Google" button.');
+      setBusy(false);
+      return;
+    }
+    // 2. Known person: sign in, and say plainly when the password is wrong.
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch {
-      setError('Sign-in failed. Check your email and password.');
+    } catch (err) {
+      const code = (err as { code?: string })?.code ?? '';
+      if (['auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/wrong-password'].includes(code)) {
+        if (known) { setError('Incorrect password. Please try again.'); }
+        else {
+          // The check was unavailable, so "no account" and "wrong password" look the same:
+          // offer registration (which links back here if the account exists).
+          navigate('/admin/register', { state: { email, password } });
+          return;
+        }
+      } else {
+        setError(code === 'auth/too-many-requests'
+          ? 'Too many attempts. Please wait a few minutes and try again.'
+          : 'Sign-in failed. Check your email and password.');
+      }
     } finally {
       setBusy(false);
     }
@@ -70,7 +111,7 @@ export default function LoginPage() {
   const shell = (children: React.ReactNode) => (
     <div style={{ maxWidth: 360, margin: '80px auto', padding: 24, fontFamily: 'var(--font-body)' }}>
       <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)', marginTop: 0 }}>
-        Admin sign in
+        User login
       </h1>
       {children}
     </div>
@@ -118,6 +159,9 @@ export default function LoginPage() {
         </button>
       </form>
       {error && <p role="alert" style={{ color: '#a00', fontSize: 13 }}>{error}</p>}
+      <p style={{ ...note, textAlign: 'center' }}>
+        New here? <Link to="/admin/register" state={{ email, password }}>Create an account</Link>
+      </p>
     </>,
   );
 }
