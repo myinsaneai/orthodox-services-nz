@@ -26,7 +26,6 @@ const NAV: { to: string; key: StringKey }[] = [
 const MY_PAGE = { to: '/admin', key: 'navMyPage' as StringKey };
 const MY_PAGE_SECTIONS: { to: string; key: StringKey; min: RoleName }[] = [
   { to: '/admin/profile', key: 'navProfile', min: 'user' },
-  { to: '/admin/parishes', key: 'navParishes', min: 'admin' },
   { to: '/admin/users',   key: 'navUsers',   min: 'admin' },
 ];
 
@@ -74,6 +73,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         <img className="seal" src={sealLeft} alt="Ecumenical Patriarchate" />
         <div className="site-header__text">
           <div className="site-title">{t('siteTitle', lang)}</div>
+          <div className="site-subtitle">{t('siteSubtitle', lang)}</div>
           <div className="site-menu">
           <nav aria-label="Main navigation" className="site-nav">
             {items.map(item => (

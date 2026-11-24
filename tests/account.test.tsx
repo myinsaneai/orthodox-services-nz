@@ -81,8 +81,8 @@ describe('header account control', () => {
     };
     expect(sections('user')).toEqual(['Profile']);
     expect(sections('coordinator')).toEqual(['Profile']);
-    expect(sections('admin')).toEqual(['Profile', 'Parishes', 'Users']);
-    expect(sections('superadmin')).toEqual(['Profile', 'Parishes', 'Users']);
+    expect(sections('admin')).toEqual(['Profile', 'Users']);
+    expect(sections('superadmin')).toEqual(['Profile', 'Users']);
 
     localStorage.clear(); setRoleHint('admin');
     mount();                                         // on /services: no second line

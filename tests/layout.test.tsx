@@ -19,7 +19,8 @@ afterEach(() => { cleanup(); document.documentElement.lang = ''; });
 describe('header', () => {
   it('shows the title and both seals flanking it', () => {
     mount();
-    expect(screen.getByText('Greek Orthodox Parishes of New Zealand')).toBeTruthy();
+    expect(screen.getByText('Holy Metropolis of New Zealand (Fiji, Tonga & Samoa)')).toBeTruthy();
+    expect(screen.getByText('Sacred Services')).toBeTruthy();
     const left = screen.getByAltText('Ecumenical Patriarchate');
     const right = screen.getByAltText('Holy Metropolis of New Zealand');
     expect(left.getAttribute('src')).toBeTruthy();
@@ -48,7 +49,8 @@ describe('header', () => {
     mount();
     const header = screen.getByRole('banner');
     expect(header.className).toBe('site-header');
-    expect(header.querySelector('.site-title')?.textContent).toBe('Greek Orthodox Parishes of New Zealand');
+    expect(header.querySelector('.site-title')?.textContent).toBe('Holy Metropolis of New Zealand (Fiji, Tonga & Samoa)');
+    expect(header.querySelector('.site-subtitle')?.textContent).toBe('Sacred Services');
     expect(screen.getByRole('navigation', { name: 'Main navigation' }).className).toBe('site-nav');
     expect(header.querySelectorAll('img.seal')).toHaveLength(2);
   });
@@ -96,5 +98,19 @@ describe('language', () => {
     localStorage.setItem('gp_lang', 'fr');
     mount();
     expect(document.documentElement.lang).toBe('en');
+  });
+});
+
+describe('header title in Greek', () => {
+  it('shows the Greek title and subtitle', () => {
+    localStorage.setItem('gp_lang', 'el');
+    mount();
+    expect(screen.getByText('Ιερά Μητρόπολις Νέας Ζηλανδίας (Φίτζι, Τόνγκα και Σαμόα)')).toBeTruthy();
+    expect(screen.getByText('Ιερές Ακολουθίες')).toBeTruthy();
+  });
+  it('puts the subtitle straight under the title, before the menu', () => {
+    mount();
+    const text = screen.getByRole('banner').querySelector('.site-header__text')!;
+    expect([...text.children].slice(0, 3).map(e => e.className)).toEqual(['site-title', 'site-subtitle', 'site-menu']);
   });
 });

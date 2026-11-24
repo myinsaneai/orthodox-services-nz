@@ -32,29 +32,34 @@ body {
 
 a { color: inherit; }
 
-/* Header seals: 100px on desktop, scale down on small screens */
+/* Header seals: 100px on desktop, scale down on small screens. They sit at the top of the
+   header, the first at the far left and the second at the far right (see .site-header). */
 .seal { width: 100px; height: 100px; object-fit: contain; flex-shrink: 0; }
 @media (max-width: 600px) {
   .seal { width: 56px; height: 56px; }
 }
 
 /* ── Layout ───────────────────────────────────────────────────────────────────
+   Header (all sizes): the left seal at the far left, the right seal at the far right, both
+   aligned to the top; the title, subtitle and menu between them, centred.
    Small screens: everything centred, content in a narrow column.
-   From 900px up: the header is left-aligned as one group (seal, title and
-   menu, seal), page headings and content start at the left page edge
-   (--gutter), and the content uses the full browser width (cards fill it in
-   as many columns as fit). */
+   From 900px up: page headings and content start at the left page edge (--gutter), and the
+   content uses the full browser width (cards fill it in as many columns as fit). */
 :root { --gutter: 20px; }
 
 .site-header {
   background: var(--color-primary);
   padding: 10px var(--gutter);
-  display: flex; align-items: center; justify-content: center; gap: 10px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
 }
-.site-header__text { text-align: center; min-width: 0; }
+.site-header__text { flex: 1 1 0; text-align: center; min-width: 0; }
 .site-title {
-  font-family: var(--font-display); font-weight: 600; font-size: 19px;
-  color: var(--color-accent-lt); letter-spacing: 0.5px;
+  font-family: var(--font-display); font-weight: 600; font-size: 16px; line-height: 1.25;
+  color: var(--color-accent-lt); letter-spacing: 0.3px;
+}
+.site-subtitle {
+  font-family: var(--font-display); font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--color-nav); opacity: 0.9; margin-top: 3px;
 }
 .site-nav {
   display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 18px;
@@ -180,12 +185,12 @@ a { color: inherit; }
 @media (min-width: 900px) {
   :root { --gutter: 40px; }
 
-  .site-header { justify-content: flex-start; gap: 24px; padding-top: 12px; padding-bottom: 12px; }
-  .site-header__text { text-align: left; }            /* no flex-grow: the second seal stays next to the title */
-  .site-title { font-size: 28px; }
-  .site-nav { justify-content: flex-start; gap: 28px; font-size: 14px; margin-top: 8px; }
-  .site-menu { justify-content: flex-start; column-gap: 28px; margin-top: 8px; }
-  .site-subnav { justify-content: flex-start; gap: 28px; font-size: 14px; margin-top: 10px; padding-top: 8px; }
+  .site-header { gap: 24px; padding-top: 12px; padding-bottom: 12px; }
+  .site-title { font-size: 24px; }
+  .site-subtitle { font-size: 15px; margin-top: 4px; }
+  .site-nav { gap: 28px; font-size: 14px; margin-top: 8px; }
+  .site-menu { column-gap: 28px; margin-top: 8px; }
+  .site-subnav { gap: 28px; font-size: 14px; margin-top: 10px; padding-top: 8px; }
   .site-account { font-size: 14px; }
 
   .hero { text-align: left; padding-top: 24px; padding-bottom: 22px; }

@@ -5,7 +5,8 @@
 import type { Lang } from '../contexts/LangContext';
 
 const strings = {
-  siteTitle:       { en: 'Greek Orthodox Parishes of New Zealand', el: 'Ελληνορθόδοξες Ενορίες Νέας Ζηλανδίας' },
+  siteTitle:       { en: 'Holy Metropolis of New Zealand (Fiji, Tonga & Samoa)', el: 'Ιερά Μητρόπολις Νέας Ζηλανδίας (Φίτζι, Τόνγκα και Σαμόα)' },
+  siteSubtitle:    { en: 'Sacred Services', el: 'Ιερές Ακολουθίες' },
   navServices:     { en: 'Services', el: 'Ακολουθίες' },
   navParishes:     { en: 'Parishes', el: 'Ενορίες' },
   navAbout:        { en: 'About', el: 'Σχετικά' },

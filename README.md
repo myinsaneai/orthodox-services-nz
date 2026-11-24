@@ -136,7 +136,7 @@ Security rules (`firestore.rules`): everything is publicly readable except `user
 8. **Launch and handover.** First superadmin, onboarding of coordinators.
 
 ### Testing
-- `npm test` (Vitest 5 + jsdom + Testing Library): 269 tests in 20 files. Firebase is always faked; no test touches the network or an emulator.
+- `npm test` (Vitest 5 + jsdom + Testing Library): 273 tests in 20 files. Firebase is always faked; no test touches the network or an emulator.
 - `tests/schedule.test.ts`: NZ date around daylight-saving changes, English/Greek date text, scope resolution, hidden parishes.
 - `tests/i18n.test.ts`: every string has real English and Greek text; the three agreed menu items.
 - `tests/rules.test.ts`: **static** checks of `firestore.rules` and `firestore.indexes.json` against the code (every collection has a rule, no open writes, writes tied to the parish, the indexes the queries need). They read the files; they do not run the rules.

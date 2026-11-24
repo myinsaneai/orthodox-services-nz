@@ -35,16 +35,30 @@ describe('small screens (default)', () => {
   });
 });
 
+describe('header (all sizes)', () => {
+  it('puts the first seal at the far left and the second at the far right, both at the top', () => {
+    const h = rule(css, '.site-header');
+    expect(h).toMatch(/display:\s*flex/);
+    expect(h).toMatch(/justify-content:\s*space-between/);
+    expect(h).toMatch(/align-items:\s*flex-start/);
+  });
+  it('lets the centred text take the space between the seals, and keeps the seals from shrinking', () => {
+    expect(rule(css, '.site-header__text')).toMatch(/flex:\s*1 1 0/);
+    expect(rule(css, '.seal')).toMatch(/flex-shrink:\s*0/);
+  });
+  it('the title is smaller than before (19px / 28px) and a subtitle follows it', () => {
+    expect(parseInt(rule(css, '.site-title').match(/font-size:\s*(\d+)px/)![1])).toBeLessThan(19);
+    expect(parseInt(rule(desktop(), '.site-title').match(/font-size:\s*(\d+)px/)![1])).toBeLessThan(28);
+    expect(rule(css, '.site-subtitle')).toMatch(/font-size/);
+  });
+});
+
 describe('large screens (min-width 900px)', () => {
   const d = desktop();
-  it('left-aligns the site title and the menu', () => {
-    expect(rule(d, '.site-header__text')).toMatch(/text-align:\s*left/);
-    expect(rule(d, '.site-nav')).toMatch(/justify-content:\s*flex-start/);
-  });
-  it('keeps both seals grouped with the title on the left (the title block does not grow)', () => {
-    expect(rule(d, '.site-header')).toMatch(/justify-content:\s*flex-start/);
-    expect(rule(d, '.site-header__text')).not.toMatch(/flex(-grow)?:\s*[1-9]/);
-    expect(rule(css, '.site-header__text')).not.toMatch(/flex(-grow)?:\s*[1-9]/);
+  it('keeps the site title, subtitle and menu centred between the seals', () => {
+    expect(d).not.toMatch(/\.site-header__text\s*\{[^}]*text-align:\s*left/);
+    expect(d).not.toMatch(/\.site-(nav|menu|subnav)\s*\{[^}]*justify-content:\s*flex-start/);
+    expect(rule(css, '.site-header__text')).toMatch(/text-align:\s*center/);
   });
   it('left-aligns the page heading', () => {
     expect(rule(d, '.hero')).toMatch(/text-align:\s*left/);
