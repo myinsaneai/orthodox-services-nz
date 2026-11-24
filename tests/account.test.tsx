@@ -66,7 +66,7 @@ describe('header account control', () => {
       cleanup();
     });
   });
-  it('the second line shows only inside My page: Profile first, Users only for admins', () => {
+  it('the second line shows only inside My page: Profile first; Parishes and Users only for admins', () => {
     const sections = (role: 'user' | 'coordinator' | 'admin' | 'superadmin') => {
       localStorage.clear(); setRoleHint(role);
       render(
@@ -81,8 +81,8 @@ describe('header account control', () => {
     };
     expect(sections('user')).toEqual(['Profile']);
     expect(sections('coordinator')).toEqual(['Profile']);
-    expect(sections('admin')).toEqual(['Profile', 'Users']);
-    expect(sections('superadmin')).toEqual(['Profile', 'Users']);
+    expect(sections('admin')).toEqual(['Profile', 'Parishes', 'Users']);
+    expect(sections('superadmin')).toEqual(['Profile', 'Parishes', 'Users']);
 
     localStorage.clear(); setRoleHint('admin');
     mount();                                         // on /services: no second line

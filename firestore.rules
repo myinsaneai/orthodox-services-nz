@@ -35,8 +35,44 @@ service cloud.firestore {
          parishId in get(myProfile()).data.parishIds);
     }
 
-    // Public read; superadmin write (parish list, groups, site settings).
-    match /parishes/{id}  { allow read: if true; allow write: if isSuperAdmin(); }
+    // Parishes: public read. An admin or superadmin adds a parish (create only, shape checked);
+    // changing or deleting one stays with the superadmin until the parish editor exists.
+    function reqStr(f, min, max) {
+      return request.resource.data.get(f, null) is string &&
+             request.resource.data.get(f, '').size() >= min && request.resource.data.get(f, '').size() <= max;
+    }
+    function optStr(f, max) {
+      return request.resource.data.get(f, '') is string && request.resource.data.get(f, '').size() <= max;
+    }
+    function parishOk(id) {
+      return request.resource.data.keys().hasOnly(
+               ['slug', 'nameEn', 'nameEl', 'state', 'city', 'cityEl', 'address', 'descriptionEn', 'descriptionEl',
+                'mapUrl', 'photoURL', 'groupIds', 'accentColor', 'order', 'visible'])
+          && request.resource.data.keys().hasAll(
+               ['slug', 'nameEn', 'nameEl', 'state', 'city', 'cityEl', 'address', 'groupIds', 'accentColor', 'order', 'visible'])
+          && request.resource.data.slug == id
+          && reqStr('nameEn', 1, 120) && reqStr('nameEl', 1, 120)
+          && reqStr('city', 1, 80) && reqStr('cityEl', 1, 80)
+          && reqStr('state', 1, 20)
+          && reqStr('address', 1, 500) && optStr('descriptionEn', 2000) && optStr('descriptionEl', 2000)
+          && optStr('accentColor', 20)
+          && optStr('mapUrl', 500)
+          && (request.resource.data.get('mapUrl', '') == '' ||
+              request.resource.data.get('mapUrl', '').matches(
+                'https://(www[.])?google[.]([a-z]+[.])?[a-z]+/maps.*|https://maps[.]google[.]([a-z]+[.])?[a-z]+/.*|https://maps[.]app[.]goo[.]gl/.*|https://goo[.]gl/maps/.*'))
+          && optStr('photoURL', 2000)
+          && (request.resource.data.get('photoURL', '') == '' ||
+              request.resource.data.get('photoURL', '').matches('https://firebasestorage[.]googleapis[.]com/.*'))
+          && request.resource.data.groupIds == []
+          && request.resource.data.order is number
+          && request.resource.data.visible is bool;
+    }
+    match /parishes/{id} {
+      allow read: if true;
+      allow create: if isAdminUp() && parishOk(id);
+      allow update, delete: if isSuperAdmin();
+    }
+    // Public read; superadmin write (groups, site settings).
     match /groups/{id}    { allow read: if true; allow write: if isSuperAdmin(); }
     match /settings/{id}  { allow read: if true; allow write: if isSuperAdmin(); }
 

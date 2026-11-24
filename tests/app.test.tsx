@@ -120,7 +120,7 @@ describe('admin area (My page)', () => {
     const main = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(within(main).getByRole('link', { name: 'My page' }).getAttribute('href')).toBe('/admin');
     const sub = screen.getByRole('navigation', { name: 'My page sections' });
-    expect(within(sub).getAllByRole('link').map(a => a.textContent)).toEqual(['Profile', 'Users']);
+    expect(within(sub).getAllByRole('link').map(a => a.textContent)).toEqual(['Profile', 'Parishes', 'Users']);
     expect(within(sub).getByRole('link', { name: 'Users' }).getAttribute('href')).toBe('/admin/users');
   });
   it('the Users line opens the Users page for an admin', async () => {

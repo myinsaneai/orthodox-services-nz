@@ -12,6 +12,7 @@ import SiteLayout from '../components/SiteLayout';
 const LoginPage      = lazy(() => import('./LoginPage'));
 const RegisterPage   = lazy(() => import('./RegisterPage'));
 const ProfilePage    = lazy(() => import('./ProfilePage'));
+const ParishesAdminPage = lazy(() => import('./ParishesAdminPage'));
 const UsersPage      = lazy(() => import('./UsersPage'));
 
 const loadingFallback = (
@@ -28,6 +29,9 @@ export default function AdminApp() {
           <Route index element={<Navigate to="profile" replace />} />
           <Route path="profile" element={
             <AuthGuard><SiteLayout><ProfilePage /></SiteLayout></AuthGuard>
+          } />
+          <Route path="parishes" element={
+            <AuthGuard minRole="admin"><SiteLayout><ParishesAdminPage /></SiteLayout></AuthGuard>
           } />
           <Route path="users" element={
             <AuthGuard minRole="admin"><SiteLayout><UsersPage /></SiteLayout></AuthGuard>

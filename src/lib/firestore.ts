@@ -28,8 +28,14 @@ export interface Parish {
   slug: string;
   nameEn: string;
   nameEl: string;
-  city: string;
+  city: string;          // city in English (cityEl: the Greek spelling)
   address: string;
+  state?: string;        // id from src/lib/states.ts (nz, fj, to, ws)
+  cityEl?: string;
+  descriptionEn?: string;
+  descriptionEl?: string;
+  mapUrl?: string;       // Google Maps link, '' when none
+  photoURL?: string;     // Firebase Storage address of the parish photo, '' when none
   groupIds: string[];
   accentColor: string; // small per-parish accent (hex)
   order: number;
@@ -90,6 +96,11 @@ export function subscribeParishes(cb: (p: Parish[]) => void): Unsubscribe {
 }
 export async function saveParish(p: Parish) {
   await setDoc(doc(db, 'parishes', p.id), p, { merge: true });
+}
+/** A new parish (admins). It must not exist yet: the rules refuse overwriting. */
+export async function createParish(p: Parish) {
+  const { id, ...data } = p;                 // the id is the document name, not a field (the rules allow no extra fields)
+  await setDoc(doc(db, 'parishes', id), data);
 }
 export async function deleteParish(id: string) {
   await deleteDoc(doc(db, 'parishes', id));

@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { PHOTO_URL_PATTERN } from '../src/lib/photoUrl';
+import { MAP_URL_PATTERN } from '../src/lib/mapUrl';
 
 const rules = readFileSync('firestore.rules', 'utf8');
 const code = readFileSync('src/lib/firestore.ts', 'utf8');
@@ -33,12 +34,32 @@ describe('firestore.rules', () => {
     expect(rules).not.toMatch(/allow\s+(write|create|update|delete)[^;]*:\s*if\s+true/);
     expect(rules).not.toMatch(/match \/\{document=\*\*\}/);
   });
-  it('parishes, groups and settings are readable by all but written only by a superadmin', () => {
-    ['parishes', 'groups', 'settings'].forEach(c => {
+  it('groups and settings are readable by all but written only by a superadmin', () => {
+    ['groups', 'settings'].forEach(c => {
       const b = block(c);
       expect(b, c).toMatch(/allow read: if true/);
       expect(b, c).toMatch(/allow write: if isSuperAdmin\(\)/);
     });
+  });
+  it('parishes: public read; an admin may create (shape checked); change and delete stay with the superadmin', () => {
+    const b = block('parishes');
+    expect(b).toMatch(/allow read: if true/);
+    expect(b).toMatch(/allow create: if isAdminUp\(\) && parishOk\(id\)/);
+    expect(b).toMatch(/allow update, delete: if isSuperAdmin\(\)/);
+    expect(b).not.toMatch(/allow write/);
+  });
+  it('a new parish: only known fields, the id equals the slug, Greek and English names and city required', () => {
+    const fn = rules.slice(rules.indexOf('function parishOk'), rules.indexOf('match /parishes/'));
+    expect(fn).toMatch(/keys\(\)\.hasOnly\(/);
+    expect(fn).toMatch(/keys\(\)\.hasAll\(\s*\['slug', 'nameEn', 'nameEl', 'state', 'city', 'cityEl', 'address'/);
+    expect(fn).toMatch(/request\.resource\.data\.slug == id/);
+    ['nameEn', 'nameEl', 'city', 'cityEl', 'address'].forEach(f => expect(fn).toContain(`reqStr('${f}', 1,`));
+    expect(fn).toMatch(/groupIds == \[\]/);
+  });
+  it('a parish location is a Google Maps link and a parish photo is from our Storage; same pattern as the app', () => {
+    expect(rules).toContain(MAP_URL_PATTERN);
+    const fn = rules.slice(rules.indexOf('function parishOk'), rules.indexOf('match /parishes/'));
+    expect(fn).toContain("matches('https://firebasestorage[.]googleapis[.]com/.*')");
   });
   it('the retired admins records are readable only by their owner or a superadmin, and nobody writes them', () => {
     const b = block('admins');
@@ -137,10 +158,10 @@ describe('firestore.indexes.json', () => {
 
 describe('storage.rules', () => {
   const storage = readFileSync('storage.rules', 'utf8');
-  it('only avatars/<uid>/<file> is open for anything; everything else is denied by default', () => {
+  it('only avatars/<uid>/<file> and parishes/<id>/<file> are open for anything; everything else is denied by default', () => {
     expect(storage).toMatch(/match \/avatars\/\{uid\}\/\{file\}/);
     expect(storage).not.toMatch(/allPaths/);
-    expect(storage).not.toMatch(/if true/);
+    expect(storage).not.toMatch(/allow\s+(create|update|write|delete)[^;]*if true/);
   });
   it('a person writes and deletes only in their own folder; uploads are a JPEG under 3 MB', () => {
     expect(storage).toMatch(/allow create, update: if request\.auth != null && request\.auth\.uid == uid/);
@@ -150,5 +171,12 @@ describe('storage.rules', () => {
   });
   it('reading needs a signed-in person', () => {
     expect(storage).toMatch(/allow read: if request\.auth != null/);
+  });
+  it('parish photos: anyone reads (public page), only admins write, JPEG under 3 MB', () => {
+    const b = storage.slice(storage.indexOf('match /parishes/'));
+    expect(b).toMatch(/allow read: if true/);
+    expect(b).toMatch(/allow create, update: if isAdminUp\(\)[\s\S]*size < 3 \* 1024 \* 1024[\s\S]*contentType == 'image\/jpeg'/);
+    expect(b).toMatch(/allow delete: if isAdminUp\(\)/);
+    expect(storage).toMatch(/firestore\.get\(\/databases\/\(default\)\/documents\/users\/\$\(request\.auth\.uid\)\)\.data\.role in \['admin', 'superadmin'\]/);
   });
 });

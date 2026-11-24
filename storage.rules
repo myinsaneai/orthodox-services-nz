@@ -2,6 +2,12 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    function isAdminUp() {
+      return request.auth != null
+          && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
+    }
+
     // Profile photos live at avatars/<uid>/<file>. A person manages only their own folder;
     // the app always uploads a JPEG of at most 1024 px (well under 3 MB). Other signed-in
     // people can list and read (the profile stores a download link, which works anyway).
@@ -11,6 +17,16 @@ service firebase.storage {
                             && request.resource.size < 3 * 1024 * 1024
                             && request.resource.contentType == 'image/jpeg';
       allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+    // Parish photos live at parishes/<parishId>/<file>: public to read (the parish page is public);
+    // only an admin or superadmin writes, looked up in their users/<uid> profile. The first deploy
+    // may ask to let Storage rules read Firestore: say yes.
+    match /parishes/{parishId}/{file} {
+      allow read: if true;
+      allow create, update: if isAdminUp()
+                            && request.resource.size < 3 * 1024 * 1024
+                            && request.resource.contentType == 'image/jpeg';
+      allow delete: if isAdminUp();
     }
     // Nothing else is stored here.
   }

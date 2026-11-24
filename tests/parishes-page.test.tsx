@@ -25,11 +25,12 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Parishes page', () => {
-  it('lists visible parishes only, with city and address', () => {
+  it('lists visible parishes only, with city and address (address under the description)', () => {
     mount();
     expect(screen.getByRole('heading', { name: 'Parishes' })).toBeTruthy();
     expect(screen.getByText('Holy Trinity')).toBeTruthy();
-    expect(screen.getByText('Wellington · 5 Hania St')).toBeTruthy();
+    expect(screen.getByText('Wellington')).toBeTruthy();
+    expect(screen.getByText('5 Hania St')).toBeTruthy();
     expect(screen.getByText('Auckland')).toBeTruthy();       // no address: just the city
     expect(screen.queryByText('Hidden')).toBeNull();
   });
@@ -54,5 +55,46 @@ describe('Parishes page', () => {
     mount();
     expect(screen.getByRole('heading', { name: 'Parishes' })).toBeTruthy();
     expect(screen.queryAllByRole('link')).toHaveLength(0);
+  });
+
+  describe('new parish fields', () => {
+    const full = () => [{
+      id: 'n', slug: 'st-john', nameEn: 'St John', nameEl: 'Άγιος Ιωάννης', city: 'Suva', cityEl: 'Σούβα', address: '12 Victoria Pde\nSuva',
+      state: 'fj', descriptionEn: 'A small parish.', descriptionEl: 'Μια μικρή ενορία.',
+      mapUrl: 'https://maps.app.goo.gl/abc', photoURL: 'https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg',
+      groupIds: [], accentColor: '', order: 1, visible: true,
+    }];
+    it('shows city, state, description, photo and a map link in English', () => {
+      h.parishes = full();
+      const { container } = mount();
+      expect(screen.getByText('Suva · Fiji')).toBeTruthy();
+      expect(screen.getByText('A small parish.')).toBeTruthy();
+      expect(container.querySelector('.pc-addr')?.textContent).toBe('12 Victoria Pde\nSuva');   // one address in both languages
+      expect(container.querySelector('img.pc-photo')?.getAttribute('src')).toContain('firebasestorage.googleapis.com');
+      const map = screen.getByRole('link', { name: 'View on map' });
+      expect(map.getAttribute('href')).toBe('https://maps.app.goo.gl/abc');
+      expect(map.getAttribute('rel')).toContain('noopener');
+    });
+    it('shows the Greek versions in Greek', () => {
+      localStorage.setItem('gp_lang', 'el');
+      h.parishes = full();
+      mount();
+      expect(screen.getByText('Σούβα · Φίτζι')).toBeTruthy();
+      expect(screen.getByText('Μια μικρή ενορία.')).toBeTruthy();
+      expect(screen.getByText(/12 Victoria Pde/)).toBeTruthy();
+      expect(screen.getByRole('link', { name: 'Δείτε στον χάρτη' })).toBeTruthy();
+    });
+    it('never shows a map link or photo from an address that is not allowed', () => {
+      h.parishes = [{ ...full()[0], mapUrl: 'https://evil.example/x', photoURL: 'https://evil.example/p.jpg' }];
+      const { container } = mount();
+      expect(screen.queryByRole('link', { name: 'View on map' })).toBeNull();
+      expect(container.querySelector('img')).toBeNull();
+    });
+    it('the card has one schedule link (the map link is separate, not nested)', () => {
+      h.parishes = full();
+      mount();
+      expect(screen.getByRole('link', { name: /St John/ }).getAttribute('href')).toBe('/services?parish=st-john');
+      expect(screen.getByRole('link', { name: /St John/ }).querySelector('a')).toBeNull();
+    });
   });
 });

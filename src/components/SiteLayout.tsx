@@ -26,6 +26,7 @@ const NAV: { to: string; key: StringKey }[] = [
 const MY_PAGE = { to: '/admin', key: 'navMyPage' as StringKey };
 const MY_PAGE_SECTIONS: { to: string; key: StringKey; min: RoleName }[] = [
   { to: '/admin/profile', key: 'navProfile', min: 'user' },
+  { to: '/admin/parishes', key: 'navParishes', min: 'admin' },
   { to: '/admin/users',   key: 'navUsers',   min: 'admin' },
 ];
 
