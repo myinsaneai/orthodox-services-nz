@@ -88,6 +88,12 @@ export function subscribeParishes(cb: (p: Parish[]) => void): Unsubscribe {
 export async function saveParish(p: Parish) {
   await setDoc(doc(db, 'parishes', p.id), p, { merge: true });
 }
+/** Rewrites only the `order` of the given parishes (after a move up or down; admins). The rules check the whole record. */
+export async function setParishOrder(items: { id: string; order: number }[]) {
+  const batch = writeBatch(db);
+  items.forEach(i => batch.update(doc(db, 'parishes', i.id), { order: i.order }));
+  await batch.commit();
+}
 /** A new parish (admins). It must not exist yet: the rules refuse overwriting. */
 export async function createParish(p: Parish) {
   const { id, ...data } = p;                 // the id is the document name, not a field (the rules allow no extra fields)

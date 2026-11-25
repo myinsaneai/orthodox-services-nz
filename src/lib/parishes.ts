@@ -3,6 +3,7 @@
 // Pure functions (tested); the form and Firestore calls live elsewhere.
 
 import { PARISH_STATES } from './states';
+import type { ParishState } from './states';
 import { isMapUrl } from './mapUrl';
 import type { Parish } from './firestore';
 
@@ -88,4 +89,39 @@ export function buildParish(f: ParishForm, photoURL: string, existing: Pick<Pari
     mapUrl: f.mapUrl.trim(), photoURL,
     groupIds: [], accentColor: '', order, visible: true,
   };
+}
+
+export interface StateSection { state: ParishState | null; parishes: Parish[] }
+
+/**
+ * Parishes split by state, in the order of PARISH_STATES (New Zealand first). Inside a state the
+ * parishes keep their `order`. Empty states are left out. A parish with no state, or one this list
+ * does not know, goes in a last section with `state: null`, so it never disappears.
+ */
+export function groupByState(parishes: Parish[]): StateSection[] {
+  const byOrder = (a: Parish, b: Parish) => (a.order ?? 0) - (b.order ?? 0);
+  const known = new Set(PARISH_STATES.map(s => s.id));
+  const sections: StateSection[] = PARISH_STATES.map(state => ({
+    state, parishes: parishes.filter(p => p.state === state.id).sort(byOrder),
+  }));
+  sections.push({ state: null, parishes: parishes.filter(p => !p.state || !known.has(p.state)).sort(byOrder) });
+  return sections.filter(s => s.parishes.length > 0);
+}
+
+/**
+ * Moves one parish up (-1) or down (+1) inside its state's list (already in display order).
+ * The state keeps the same set of `order` numbers, shared out again in the new sequence, so no other
+ * state is touched. Returns only the parishes whose `order` changes ([] when the move is impossible).
+ * If two parishes in the list share a number, the numbers are first made strictly increasing.
+ */
+export function moveParishInList(list: Parish[], index: number, dir: -1 | 1): { id: string; order: number }[] {
+  const to = index + dir;
+  if (index < 0 || index >= list.length || to < 0 || to >= list.length) return [];
+  const slots: number[] = [];
+  list.map(p => p.order ?? 0).sort((a, b) => a - b).forEach((v, i) => slots.push(i === 0 ? v : Math.max(v, slots[i - 1] + 1)));
+  const next = list.slice();
+  [next[index], next[to]] = [next[to], next[index]];
+  return next
+    .map((p, i) => ({ id: p.id, order: slots[i] }))
+    .filter(x => x.order !== list.find(p => p.id === x.id)!.order);
 }

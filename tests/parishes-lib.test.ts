@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { PARISH_STATES, stateById } from '../src/lib/states';
 import { isMapUrl, safeMapUrl } from '../src/lib/mapUrl';
-import { emptyParishForm, checkParishForm, slugify, uniqueSlug, buildParish, formFromParish, buildParishUpdate } from '../src/lib/parishes';
+import { emptyParishForm, checkParishForm, slugify, uniqueSlug, buildParish, formFromParish, buildParishUpdate, groupByState, moveParishInList } from '../src/lib/parishes';
 import type { ParishForm } from '../src/lib/parishes';
 
 const form = (over: Partial<ParishForm> = {}): ParishForm => ({
@@ -140,5 +140,43 @@ describe('what is written matches firestore.rules', () => {
   it('createParish removes the id from what it writes', () => {
     const code = readFileSync('src/lib/firestore.ts', 'utf8');
     expect(code).toMatch(/const \{ id, \.\.\.data \} = p;[\s\S]*setDoc\(doc\(db, 'parishes', id\), data\)/);
+  });
+});
+
+describe('groupByState / moveParishInList', () => {
+  const p = (id: string, state: string | undefined, order: number) => ({ id, state, order } as any);
+  it('orders sections as New Zealand, Fiji, Tonga, Samoa and puts unknown or missing states last', () => {
+    const out = groupByState([p('a', 'ws', 1), p('b', undefined, 2), p('c', 'nz', 3), p('d', 'zz', 4), p('e', 'to', 5)]);
+    expect(out.map(s => s.state?.id ?? null)).toEqual(['nz', 'to', 'ws', null]);
+    expect(out[3].parishes.map(x => x.id)).toEqual(['b', 'd']);
+  });
+  it('sorts inside a state by order and does not change the input', () => {
+    const input = [p('a', 'nz', 9), p('b', 'nz', 2), p('c', 'nz', 5)];
+    expect(groupByState(input)[0].parishes.map(x => x.id)).toEqual(['b', 'c', 'a']);
+    expect(input.map(x => x.id)).toEqual(['a', 'b', 'c']);
+  });
+  it('an empty list gives no sections', () => { expect(groupByState([])).toEqual([]); });
+
+  const list = [p('a', 'nz', 4), p('b', 'nz', 9), p('c', 'nz', 12)];
+  it('swaps the two numbers; the third keeps its own', () => {
+    expect(moveParishInList(list, 0, 1)).toEqual([{ id: 'b', order: 4 }, { id: 'a', order: 9 }]);
+    expect(moveParishInList(list, 2, -1)).toEqual([{ id: 'c', order: 9 }, { id: 'b', order: 12 }]);
+  });
+  it('refuses moves off either end', () => {
+    expect(moveParishInList(list, 0, -1)).toEqual([]);
+    expect(moveParishInList(list, 2, 1)).toEqual([]);
+    expect(moveParishInList(list, 5, 1)).toEqual([]);
+    expect(moveParishInList([], 0, 1)).toEqual([]);
+  });
+  it('repairs duplicate numbers so the move really changes the sequence', () => {
+    const dup = [p('a', 'nz', 3), p('b', 'nz', 3), p('c', 'nz', 3)];
+    const changes = moveParishInList(dup, 0, 1);
+    const result = new Map(dup.map(x => [x.id, x.order]));
+    changes.forEach(c => result.set(c.id, c.order));
+    const sequence = [...result].sort((x, y) => x[1] - y[1]).map(x => x[0]);
+    expect(sequence).toEqual(['b', 'a', 'c']);
+  });
+  it('writes only `order` (the rules check the merged record, so no other field is sent)', () => {
+    moveParishInList(list, 0, 1).forEach(c => expect(Object.keys(c).sort()).toEqual(['id', 'order']));
   });
 });
