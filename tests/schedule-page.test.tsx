@@ -370,3 +370,38 @@ describe('Greek', () => {
     expect(screen.getByText('Δεν έχει αναρτηθεί ακόμη πρόγραμμα ακολουθιών για αυτόν τον μήνα.')).toBeTruthy();
   });
 });
+
+describe('Edit links (role hint)', () => {
+  const setHint = (v: string | null) => { if (v) localStorage.setItem('gp_role', v); else localStorage.removeItem('gp_role'); };
+
+  it('shows none to the public or to a plain user', () => {
+    setHint('user');
+    const { container } = mount('/services?month=2026-11&view=calendar');
+    expect(screen.queryByRole('link', { name: 'Edit schedule' })).toBeNull();
+    fireEvent.click(cell(container, '2026-11-22'));
+    expect(screen.queryByRole('link', { name: 'Edit this day' })).toBeNull();
+  });
+  it('shows a toolbar link and a per-day link to a coordinator, keeping month and parish', () => {
+    setHint('coordinator');
+    const { container } = mount('/services?month=2026-11&view=calendar&parish=holy-trinity');
+    expect(screen.getByRole('link', { name: 'Edit schedule' }).getAttribute('href'))
+      .toBe('/admin/schedule?month=2026-11&parish=holy-trinity');
+    fireEvent.click(cell(container, '2026-11-22'));
+    expect(screen.getByRole('link', { name: 'Edit this day' }).getAttribute('href'))
+      .toBe('/admin/schedule?month=2026-11&date=2026-11-22&parish=holy-trinity');
+  });
+  it('does not name a parish when several are shown', () => {
+    setHint('admin');
+    const { container } = mount('/services?month=2026-11&view=calendar');
+    expect(screen.getByRole('link', { name: 'Edit schedule' }).getAttribute('href')).toBe('/admin/schedule?month=2026-11');
+    fireEvent.click(cell(container, '2026-11-22'));
+    expect(screen.getByRole('link', { name: 'Edit this day' }).getAttribute('href'))
+      .toBe('/admin/schedule?month=2026-11&date=2026-11-22');
+  });
+  it('is available from the list view too, in Greek when the page is Greek', () => {
+    setHint('superadmin');
+    Object.defineProperty(navigator, 'language', { value: 'el-GR', configurable: true });
+    mount('/services?month=2026-11');
+    expect(screen.getByRole('link', { name: 'Επεξεργασία προγράμματος' })).toBeTruthy();
+  });
+});

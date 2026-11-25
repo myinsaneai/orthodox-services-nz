@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { todayNZ, formatWhen, resolveScope, scopeKey, visibleServices } from '../src/lib/schedule';
-import type { Parish, Group, Service } from '../src/lib/firestore';
+import { todayNZ, resolveScope } from '../src/lib/schedule';
+import type { Parish, Group } from '../src/lib/firestore';
 
 const parish = (id: string, over: Partial<Parish> = {}): Parish => ({
   id, slug: `slug-${id}`, nameEn: id, nameEl: id, city: '', address: '',
@@ -23,30 +23,6 @@ describe('New Zealand date', () => {
     expect(todayNZ(new Date('2026-09-26T13:59:00Z'))).toBe('2026-09-27');
     expect(todayNZ(new Date('2026-09-27T10:59:00Z'))).toBe('2026-09-27');
     expect(todayNZ(new Date('2026-09-27T11:00:00Z'))).toBe('2026-09-28');
-  });
-});
-
-describe('formatWhen', () => {
-  // 29 Nov 2026 is a Sunday. The values are NZ wall-clock, shown as written.
-  const s = { date: '2026-11-29', time: '09:30' };
-  it('formats in English', () => {
-    const out = formatWhen(s, 'en');
-    expect(out).toMatch(/Sun/);
-    expect(out).toMatch(/29/);
-    expect(out).toMatch(/Nov/);
-    expect(out).toMatch(/9:30/);
-    expect(out).toMatch(/am/i);
-  });
-  it('formats in Greek', () => {
-    const out = formatWhen(s, 'el');
-    expect(out).toMatch(/Κυρ/);
-    expect(out).toMatch(/29/);
-    expect(out).toMatch(/Νοε/);
-  });
-  it('does not shift the time with the machine timezone or daylight saving', () => {
-    expect(formatWhen({ date: '2026-12-25', time: '00:00' }, 'en')).toMatch(/12:00|0:00/);
-    expect(formatWhen({ date: '2026-12-25', time: '23:45' }, 'en')).toMatch(/11:45/);
-    expect(formatWhen({ date: '2026-12-25', time: '23:45' }, 'en')).toMatch(/25/);
   });
 });
 
@@ -90,25 +66,3 @@ describe('resolveScope', () => {
   });
 });
 
-describe('scopeKey', () => {
-  it('is stable and distinguishes scopes', () => {
-    expect(scopeKey('all')).toBe('all');
-    expect(scopeKey(null)).toBe('none');
-    expect(scopeKey(['a', 'b'])).toBe('a,b');
-    expect(scopeKey(['a', 'b'])).toBe(scopeKey(['a', 'b']));
-  });
-});
-
-describe('visibleServices', () => {
-  const svc = (id: string, parishId: string): Service => ({
-    id, parishId, date: '2026-12-01', time: '09:00', titleEn: '', titleEl: '', notesEn: '', notesEl: '', updatedAt: null,
-  });
-  const list = [svc('1', 'a'), svc('2', 'hidden'), svc('3', 'gone')];
-  it('drops services of hidden parishes and of parishes that no longer exist', () => {
-    const parishes = [parish('a'), parish('hidden', { visible: false })];
-    expect(visibleServices(list, parishes).map(s => s.id)).toEqual(['1']);
-  });
-  it('keeps everything while the parish list has not loaded yet', () => {
-    expect(visibleServices(list, [])).toHaveLength(3);
-  });
-});

@@ -7,13 +7,15 @@
 //   ?view=calendar                     the calendar grid (default: list)
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLang } from '../contexts/LangContext';
 import { t } from '../lib/i18n';
 import { subscribeParishes, subscribeGroups, subscribeServiceDaysForMonth } from '../lib/firestore';
 import type { Parish, Group, ServiceDay } from '../lib/firestore';
 import { todayNZ, resolveScope } from '../lib/schedule';
 import { addMonths, isMonth, monthOf } from '../lib/dates';
+import { isAtLeast } from '../lib/roles';
+import { useRoleHint } from '../hooks/useRoleHint';
 import { monthTitle } from '../lib/monthFormat';
 import { entriesByDate } from '../lib/serviceDays';
 import ServiceList from '../components/ServiceList';
@@ -38,6 +40,8 @@ export default function SchedulePage() {
   const [parishesLoaded, setParishesLoaded] = useState(false);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [showAll, setShowAll] = useState(false);
+  // A hint only: it decides whether to show the Edit links. The editor page and the rules do the real check.
+  const canEdit = isAtLeast(useRoleHint(), 'coordinator');
 
   const groupSlug = params.get('group');
   const parishSlug = params.get('parish');
@@ -72,6 +76,7 @@ export default function SchedulePage() {
     [loaded, ym, parishes, scope, lang],
   );
   // A single parish needs no parish names; "all" and groups do.
+  const editParish = parishSlug && Array.isArray(scope) && scope.length === 1 ? `&parish=${encodeURIComponent(parishSlug)}` : '';
   const multi = scope === 'all' || (Array.isArray(scope) && scope.length > 1);
 
   // Change one part of the selection and keep the others.
@@ -126,6 +131,7 @@ export default function SchedulePage() {
           {ym !== monthOf(today) && (
             <button type="button" className="svc-btn" onClick={() => goMonth(monthOf(today))}>{t('thisMonth', lang)}</button>
           )}
+          {canEdit && <Link className="svc-btn" to={`/admin/schedule?month=${ym}${editParish}`}>{t('editSchedule', lang)}</Link>}
           <div className="svc-views" role="group">
             {(['list', 'calendar'] as const).map(v => (
               <button
@@ -149,7 +155,10 @@ export default function SchedulePage() {
             showAll={showAll} onToggleShowAll={() => setShowAll(s => !s)}
           />
         ) : (
-          <ServiceCalendar key={ym} ym={ym} lang={lang} entries={entries} multi={multi} today={today} />
+          <ServiceCalendar
+            key={ym} ym={ym} lang={lang} entries={entries} multi={multi} today={today}
+            editHref={canEdit ? date => `/admin/schedule?month=${ym}&date=${date}${editParish}` : undefined}
+          />
         )}
       </div>
     </>

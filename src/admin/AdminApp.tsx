@@ -14,6 +14,8 @@ const RegisterPage   = lazy(() => import('./RegisterPage'));
 const ProfilePage    = lazy(() => import('./ProfilePage'));
 const ParishesAdminPage = lazy(() => import('./ParishesAdminPage'));
 const UsersPage      = lazy(() => import('./UsersPage'));
+const ScheduleEditorPage = lazy(() => import('./ScheduleEditorPage'));
+const TemplatesPage  = lazy(() => import('./TemplatesPage'));
 
 const loadingFallback = (
   <div style={{ padding: 40, textAlign: 'center', fontFamily: 'sans-serif' }}>Loading…</div>
@@ -41,7 +43,14 @@ export default function AdminApp() {
           <Route path="users" element={
             <AuthGuard minRole="admin"><SiteLayout><UsersPage /></SiteLayout></AuthGuard>
           } />
-          {/* Future My page sections: parishes, services, groups, requests */}
+          {/* Schedule: coordinators (own parishes) and up; templates and quick entries: admins. */}
+          <Route path="schedule" element={
+            <AuthGuard minRole="coordinator"><SiteLayout><ScheduleEditorPage /></SiteLayout></AuthGuard>
+          } />
+          <Route path="templates" element={
+            <AuthGuard minRole="admin"><SiteLayout><TemplatesPage /></SiteLayout></AuthGuard>
+          } />
+          {/* Future My page sections: groups, requests */}
         </Routes>
       </Suspense>
     </AuthProvider>

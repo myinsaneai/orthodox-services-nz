@@ -4,8 +4,9 @@
 // Collections
 //   parishes/{parishId}   one doc per parish
 //   groups/{groupId}      named groups of parishes (e.g. "Wellington group")
-//   services/{serviceId}  one doc per service occurrence, tagged with parishId (old structured model)
 //   serviceDays/{parishId}_{date}  one doc per parish per day: free-text schedule in English and Greek
+//   serviceTemplates/{id}          saved full-day schedules, applied in the editor (coordinators and up read)
+//   serviceEntryTypes/{id}         saved single lines ("9:00 Orthros") added to a day in the editor
 //   users/{uid}           one profile per signed-in person: role + (coordinators) parishIds
 //   admins/{uid}          retired: only read, once, to carry the first superadmin over to users/{uid}
 //   settings/site         site-wide settings
@@ -19,6 +20,7 @@ import { db } from './firebase';
 import { isRole } from './roles';
 import { signInMethods } from './signIn';
 import { safePhotoUrl } from './photoUrl';
+import { serviceDayId, serviceDayPayload, isEmptyDay, templatePayload, entryTypePayload } from './scheduleDocs';
 import type { SignInMethod } from './signIn';
 import type { RoleName } from './roles';
 
@@ -49,18 +51,6 @@ export interface Group {
   nameEn: string;
   nameEl: string;
   order: number;
-}
-
-export interface Service {
-  id: string;
-  parishId: string;
-  date: string;      // "YYYY-MM-DD" (NZ local date)
-  time: string;      // "HH:mm" 24h, NZ local time
-  titleEn: string;
-  titleEl: string;
-  notesEn: string;
-  notesEl: string;
-  updatedAt: unknown;
 }
 
 /** Retired collection admins/{uid}: kept only to carry the first superadmin over. */
@@ -108,9 +98,9 @@ export async function updateParish(p: Parish) {
   const { id, ...data } = p;
   await setDoc(doc(db, 'parishes', id), data);
 }
-/** Deletes a parish and every service that belongs to it (services first, so none is left pointing at nothing). */
+/** Deletes a parish and every schedule day posted for it (the days first, so none is left pointing at nothing). */
 export async function deleteParishAndServices(id: string) {
-  const snap = await getDocs(query(collection(db, 'services'), where('parishId', '==', id)));
+  const snap = await getDocs(query(collection(db, 'serviceDays'), where('parishId', '==', id)));
   for (let i = 0; i < snap.docs.length; i += 400) {
     const batch = writeBatch(db);
     snap.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
@@ -133,37 +123,6 @@ export async function saveGroup(g: Group) {
 }
 export async function deleteGroup(id: string) {
   await deleteDoc(doc(db, 'groups', id));
-}
-
-// ─── Services ─────────────────────────────────────────────────────────────────
-
-// Firestore's `in` operator accepts at most 30 values.
-const IN_LIMIT = 30;
-
-/**
- * Upcoming services from `fromDate` ("YYYY-MM-DD") onward.
- * scope = 'all'          → every parish
- * scope = string[]       → only those parish ids (single parish or a group)
- */
-export function subscribeUpcomingServices(
-  scope: 'all' | string[],
-  fromDate: string,
-  cb: (s: Service[]) => void,
-): Unsubscribe {
-  const base = collection(db, 'services');
-  const q = scope === 'all'
-    ? query(base, where('date', '>=', fromDate), orderBy('date'), orderBy('time'))
-    : query(base,
-        where('parishId', 'in', scope.slice(0, IN_LIMIT)),
-        where('date', '>=', fromDate), orderBy('date'), orderBy('time'));
-  return onSnapshot(q, snap =>
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as Service))));
-}
-export async function saveService(s: Omit<Service, 'updatedAt'>) {
-  await setDoc(doc(db, 'services', s.id), { ...s, updatedAt: serverTimestamp() }, { merge: true });
-}
-export async function deleteService(id: string) {
-  await deleteDoc(doc(db, 'services', id));
 }
 
 // ─── Service days (free-text schedule per parish per day) ──────────────────────
@@ -190,6 +149,63 @@ export function subscribeServiceDaysForMonth(
     snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceDay))),
     err => onError?.(err),
   );
+}
+
+/**
+ * Saves what a parish posts for one day (coordinators of that parish, admins). A day left empty in both
+ * languages is removed instead. The whole document is replaced.
+ */
+export async function saveServiceDay(parishId: string, date: string, entriesEn: string, entriesEl: string) {
+  const ref = doc(db, 'serviceDays', serviceDayId(parishId, date));
+  if (isEmptyDay(entriesEn, entriesEl)) { await deleteDoc(ref); return; }
+  await setDoc(ref, { ...serviceDayPayload(parishId, date, entriesEn, entriesEl), updatedAt: serverTimestamp() });
+}
+export async function deleteServiceDay(parishId: string, date: string) {
+  await deleteDoc(doc(db, 'serviceDays', serviceDayId(parishId, date)));
+}
+
+// ─── Templates and quick entries (shared by every parish) ──────────────────────
+
+/** A saved full-day schedule, in both languages. */
+export interface ServiceTemplate {
+  id: string; nameEn: string; nameEl: string;
+  entriesEn: string; entriesEl: string; order: number;
+}
+/** A saved single line, e.g. "9:00 Orthros" / "9:00 Όρθρος". */
+export interface ServiceEntryType {
+  id: string; textEn: string; textEl: string; order: number;
+}
+
+export function subscribeServiceTemplates(cb: (t: ServiceTemplate[]) => void, onError?: (e: Error) => void): Unsubscribe {
+  return onSnapshot(query(collection(db, 'serviceTemplates'), orderBy('order')),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceTemplate))),
+    err => onError?.(err));
+}
+export function subscribeServiceEntryTypes(cb: (e: ServiceEntryType[]) => void, onError?: (e: Error) => void): Unsubscribe {
+  return onSnapshot(query(collection(db, 'serviceEntryTypes'), orderBy('order')),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceEntryType))),
+    err => onError?.(err));
+}
+/** A fresh document id for a new template or quick entry. */
+export const newLibraryId = (name: 'serviceTemplates' | 'serviceEntryTypes') => doc(collection(db, name)).id;
+
+export async function saveServiceTemplate(t: ServiceTemplate) {
+  await setDoc(doc(db, 'serviceTemplates', t.id), templatePayload(t));
+}
+export async function deleteServiceTemplate(id: string) {
+  await deleteDoc(doc(db, 'serviceTemplates', id));
+}
+export async function saveServiceEntryType(e: ServiceEntryType) {
+  await setDoc(doc(db, 'serviceEntryTypes', e.id), entryTypePayload(e));
+}
+export async function deleteServiceEntryType(id: string) {
+  await deleteDoc(doc(db, 'serviceEntryTypes', id));
+}
+/** Rewrites only the `order` of the given items (after a move up or down). */
+export async function setLibraryOrder(name: 'serviceTemplates' | 'serviceEntryTypes', items: { id: string; order: number }[]) {
+  const batch = writeBatch(db);
+  items.forEach(i => batch.update(doc(db, name, i.id), { order: i.order }));
+  await batch.commit();
 }
 
 // ─── Users and roles ──────────────────────────────────────────────────────────

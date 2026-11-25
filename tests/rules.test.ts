@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { PHOTO_URL_PATTERN } from '../src/lib/photoUrl';
 import { MAP_URL_PATTERN } from '../src/lib/mapUrl';
+import { DAY_TEXT_MAX, serviceDayId, serviceDayPayload, templatePayload, entryTypePayload } from '../src/lib/scheduleDocs';
 
 const rules = readFileSync('firestore.rules', 'utf8');
 const code = readFileSync('src/lib/firestore.ts', 'utf8');
@@ -25,7 +26,7 @@ function block(name: string): string {
 
 describe('firestore.rules', () => {
   it('the code uses the expected collections', () => {
-    expect([...used].sort()).toEqual(['admins', 'groups', 'parishes', 'serviceDays', 'services', 'settings', 'users']);
+    expect([...used].sort()).toEqual(['admins', 'groups', 'parishes', 'serviceDays', 'serviceEntryTypes', 'serviceTemplates', 'settings', 'users']);
   });
   it('every collection the code touches has a rule block', () => {
     used.forEach(c => expect(matched.has(c), `no rule for "${c}"`).toBe(true));
@@ -101,12 +102,48 @@ describe('firestore.rules', () => {
   it('only a superadmin deletes profiles, and never their own', () => {
     expect(block('users')).toMatch(/allow delete: if isSuperAdmin\(\) && request\.auth\.uid != uid/);
   });
-  it('services are written only for the parish the person may edit, on both old and new data', () => {
-    const b = block('services');
+  it('the old structured "services" collection is gone: no rule, no code', () => {
+    expect(rules).not.toMatch(/match \/services\//);
+    expect(code).not.toMatch(/'services'/);
+  });
+  it('service days are public to read and written only for a parish the person may edit', () => {
+    const b = block('serviceDays');
     expect(b).toMatch(/allow read: if true/);
-    expect(b).toMatch(/allow create: if request\.resource\.data\.parishId is string\s*&&\s*canEditParish\(request\.resource\.data\.parishId\)/);
-    expect(b).toMatch(/allow update: if request\.resource\.data\.parishId is string\s*&&\s*canEditParish\(resource\.data\.parishId\)\s*&&\s*canEditParish\(request\.resource\.data\.parishId\)/);
+    expect(b).toMatch(/allow create: if dayOk\(id\) && canEditParish\(request\.resource\.data\.parishId\)/);
+    expect(b).toMatch(/allow update: if dayOk\(id\)\s*&& request\.resource\.data\.parishId == resource\.data\.parishId\s*&& request\.resource\.data\.date == resource\.data\.date\s*&& canEditParish\(resource\.data\.parishId\)/);
     expect(b).toMatch(/allow delete: if canEditParish\(resource\.data\.parishId\)/);
+  });
+  it('a service day must be named parishId_date, carry the right month, and have bounded text', () => {
+    const fn = rules.slice(rules.indexOf('function dayOk'), rules.indexOf('match /serviceDays'));
+    expect(fn).toMatch(/id == request\.resource\.data\.parishId \+ '_' \+ request\.resource\.data\.date/);
+    expect(fn).toMatch(/yearMonth ==\s*request\.resource\.data\.date\.split\('-'\)\[0\] \+ '-' \+ request\.resource\.data\.date\.split\('-'\)\[1\]/);
+    expect(fn).toMatch(/date\.matches\('\[0-9\]\{4\}-\[0-9\]\{2\}-\[0-9\]\{2\}'\)/);
+    expect(fn).toMatch(/entriesEn\.size\(\) <= 4000/);
+    expect(fn).toMatch(/entriesEl\.size\(\) <= 4000/);
+    expect(fn).toMatch(/updatedAt == request\.time/);
+    expect(DAY_TEXT_MAX).toBe(4000);
+  });
+  it('what the editor writes for a day is exactly what the rules allow', () => {
+    const fn = rules.slice(rules.indexOf('function dayOk'), rules.indexOf('match /serviceDays'));
+    const allowed = [...fn.match(/hasOnly\(\[([^\]]*)\]/)![1].matchAll(/'(\w+)'/g)].map(m => m[1]).sort();
+    const sent = [...Object.keys(serviceDayPayload('p', '2026-11-25', 'a', 'b')), 'updatedAt'].sort();   // saveServiceDay adds updatedAt
+    expect(sent).toEqual(allowed);
+    expect(code).toMatch(/\{ \.\.\.serviceDayPayload\(parishId, date, entriesEn, entriesEl\), updatedAt: serverTimestamp\(\) \}/);
+    expect(serviceDayId('holy-trinity', '2026-11-25')).toBe('holy-trinity_2026-11-25');
+  });
+  it('templates and quick entries: coordinators and admins read, only admins write, fields match the app', () => {
+    for (const name of ['serviceTemplates', 'serviceEntryTypes']) {
+      const b = block(name);
+      expect(b, name).toMatch(/allow read: if isCoordinator\(\) \|\| isAdminUp\(\)/);
+      expect(b, name).toMatch(/allow create, update: if isAdminUp\(\)/);
+      expect(b, name).toMatch(/allow delete: if isAdminUp\(\)/);
+      expect(b, name).not.toMatch(/if true/);
+    }
+    const keysOf = (name: string) => [...block(name).match(/hasOnly\(\[([^\]]*)\]/)![1].matchAll(/'(\w+)'/g)].map(m => m[1]).sort();
+    const tpl = { id: 'x', nameEn: 'a', nameEl: 'b', entriesEn: 'c', entriesEl: 'd', order: 1 };
+    expect(Object.keys(templatePayload(tpl)).sort()).toEqual(keysOf('serviceTemplates'));
+    expect(Object.keys(entryTypePayload({ id: 'x', textEn: 'a', textEl: 'b', order: 1 })).sort()).toEqual(keysOf('serviceEntryTypes'));
+    expect(Object.keys(templatePayload(tpl))).not.toContain('id');
   });
   it('a coordinator is limited to the parishes listed on their profile; admins edit all', () => {
     const fn = rules.slice(rules.indexOf('function canEditParish'), rules.indexOf('// Public read'));
@@ -128,24 +165,15 @@ describe('firestore.rules', () => {
 });
 
 describe('firestore.indexes.json', () => {
-  type Idx = { collectionGroup: string; fields: { fieldPath: string; order: string }[] };
-  const has = (fields: string[]) =>
-    (indexes.indexes as Idx[]).some(i =>
-      i.collectionGroup === 'services' &&
-      i.fields.map(f => f.fieldPath).join(',') === fields.join(',') &&
-      i.fields.every(f => f.order === 'ASCENDING'));
+  it('needs no composite index: every query filters on one field, or orders by one', () => {
+    expect(indexes.indexes).toEqual([]);
+    expect(code).toMatch(/where\('yearMonth', '==', yearMonth\)/);
+    expect(code).not.toMatch(/where\([^)]*\)[^;]*where\(/);                    // never two filters in one query
+    expect(code).not.toMatch(/where\([^)]*\)[^;]*orderBy\(/);                   // never a filter plus an ordering
+  });
+})
 
-  it('has the index for "all parishes" (date range ordered by date, time)', () => {
-    expect(has(['date', 'time'])).toBe(true);
-  });
-  it('has the index for one parish or a group (parishId in [...] + date range)', () => {
-    expect(has(['parishId', 'date', 'time'])).toBe(true);
-  });
-  it('matches the queries in the code', () => {
-    expect(code).toMatch(/where\('date', '>=', fromDate\), orderBy\('date'\), orderBy\('time'\)/);
-    expect(code).toMatch(/where\('parishId', 'in', scope\.slice\(0, IN_LIMIT\)\)/);
-  });
-
+describe('more rules', () => {
   it('photo addresses are limited to Google pictures and our Firebase Storage, on create and when changed', () => {
     expect(rules).toContain(PHOTO_URL_PATTERN);               // the same pattern as src/lib/photoUrl.ts
     expect(rules).toMatch(/&& photoUrlOk\(\) && providersOk\(\)\s*\n\s*&& request\.resource\.data\.parishIds == \[\]/);

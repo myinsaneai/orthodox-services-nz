@@ -21,6 +21,12 @@ vi.mock('../src/lib/firestore', () => ({
   subscribeParishes: (cb: any) => { cb([]); return () => {}; },
   subscribeGroups: (cb: any) => { cb([]); return () => {}; },
   subscribeServiceDaysForMonth: (_ym: any, cb: any) => { cb([]); return () => {}; },
+  subscribeServiceTemplates: (cb: any) => { cb([]); return () => {}; },
+  subscribeServiceEntryTypes: (cb: any) => { cb([]); return () => {}; },
+  saveServiceDay: async () => {}, deleteServiceDay: async () => {},
+  saveServiceTemplate: async () => {}, saveServiceEntryType: async () => {},
+  deleteServiceTemplate: async () => {}, deleteServiceEntryType: async () => {},
+  setLibraryOrder: async () => {}, newLibraryId: () => 'new-id',
   ensureUserProfile: async () => { if (h.fail) throw new Error('offline'); return h.profile; },
   listUserProfiles: async () => h.users,
   updateOwnProfile: async () => {},
@@ -110,6 +116,24 @@ describe('admin area (My page)', () => {
     expect(screen.getByText('Coordinator')).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Users' })).toBeNull();
   });
+  it('a coordinator reaches the schedule editor but not the templates', async () => {
+    await open('/admin/schedule', 'coordinator', ['a']);
+    expect(await screen.findByRole('heading', { name: 'Schedule', level: 1 })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Templates' })).toBeNull();
+    cleanup();
+    h.cb = null;
+    await open('/admin/templates', 'coordinator', ['a']);
+    expect(await screen.findByText('Access denied')).toBeTruthy();
+  });
+  it('a plain user is kept out of the schedule editor', async () => {
+    await open('/admin/schedule', 'user');
+    expect(await screen.findByText('Access denied')).toBeTruthy();
+  });
+  it('an admin reaches the templates page', async () => {
+    await open('/admin/templates', 'admin');
+    expect(await screen.findByRole('heading', { name: 'Templates', level: 1 })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Quick entries' })).toBeTruthy();
+  });
   it('a coordinator is kept out of the Users page', async () => {
     await open('/admin/users', 'coordinator', ['a']);
     expect(await screen.findByText('Access denied')).toBeTruthy();
@@ -120,7 +144,7 @@ describe('admin area (My page)', () => {
     const main = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(within(main).getByRole('link', { name: 'My page' }).getAttribute('href')).toBe('/admin');
     const sub = screen.getByRole('navigation', { name: 'My page sections' });
-    expect(within(sub).getAllByRole('link').map(a => a.textContent)).toEqual(['Profile', 'Users']);
+    expect(within(sub).getAllByRole('link').map(a => a.textContent)).toEqual(['Profile', 'Schedule', 'Templates', 'Users']);
     expect(within(sub).getByRole('link', { name: 'Users' }).getAttribute('href')).toBe('/admin/users');
   });
   it('the Users line opens the Users page for an admin', async () => {

@@ -43,7 +43,7 @@ This extends the Russian parish site's single `admins/{uid}` + `sections` patter
 
 ### Schedule views
 - Three scopes on one page: all parishes, a named group of parishes (e.g. "Wellington group"), one parish. Chosen by filter chips and a parish drop-down; the choice lives in the address, so a view can be shared: `/services`, `/services?group=<slug>`, `/services?parish=<slug>`.
-- Shows upcoming services from today (New Zealand date) onward, ordered by date then time. Each entry: parish, title, date and time, optional notes.
+- A month view, as a List or a Calendar (`?month=YYYY-MM`, `?view=calendar`), with the Greek (Neo-Julian) Orthodox calendar: feasts, tone, fasting, NZ public holidays. Each day carries the posted schedule, free text in English and Greek per parish.
 - A parish can belong to several groups. A group, or a parish, that does not exist (or is hidden) shows "no services", never everything.
 - Services of a hidden parish never show, in any view.
 
@@ -64,7 +64,7 @@ This extends the Russian parish site's single `admins/{uid}` + `sections` patter
 - Dates and times are **New Zealand wall-clock** values stored as text (`"2026-12-06"`, `"09:00"`) and shown exactly as written; "today" is computed on a New Zealand clock. Nothing converts between time zones, so a service never shifts with daylight saving or with the visitor's device.
 
 ### Admin (planned)
-- Parishes, groups, services (single and recurring, with feast-day overrides), users. A coordinator sees and edits only their own parishes.
+- Parishes, groups, services (done: per-day free text with templates and quick entries; recurring generators still open), users. A coordinator sees and edits only their own parishes.
 
 ## Screens and design
 
@@ -113,16 +113,17 @@ Firestore collections (all ids are the document ids; `slug` is the URL-safe name
 
 - `parishes/{id}`: `slug`, `nameEn`, `nameEl`, `city`, `address`, `groupIds[]`, `accentColor` (hex), `order`, `visible`
 - `groups/{id}`: `slug`, `nameEn`, `nameEl`, `order`
-- `services/{id}`: `parishId`, `date` (`YYYY-MM-DD`), `time` (`HH:mm`, 24 h), `titleEn`, `titleEl`, `notesEn`, `notesEl`, `updatedAt`
+- `serviceDays/{parishId}_{YYYY-MM-DD}`: `parishId`, `date`, `yearMonth` (`YYYY-MM`), `entriesEn`, `entriesEl` (free text, one line per service), `updatedAt`
+- `serviceTemplates/{id}`: `nameEn`, `nameEl`, `entriesEn`, `entriesEl`, `order` (full-day templates, shared by all parishes)
+- `serviceEntryTypes/{id}`: `textEn`, `textEl`, `order` (quick one-line entries, shared)
 - `users/{uid}`: `uid`, `email`, `displayName`, `photoURL`, `providers` (`google` / `password`: how they sign in, shown to admins), `role` (`user` | `coordinator` | `admin` | `superadmin`), `parishIds` (list; only a coordinator has any), `createdAt`, `lastSignInAt`. Created by the person at first sign-in.
 - `admins/{uid}`: retired, read-only; only used to carry the first superadmin over to `users/{uid}`.
 - `settings/site`: `siteNameEn`, `siteNameEl`
 
-Queries and indexes (`firestore.indexes.json`):
-- all parishes: `services` where `date >= today`, ordered by `date`, `time` (index: date, time)
-- one parish or a group: the same plus `parishId in [...]` (index: parishId, date, time). Firestore allows at most 30 values in `in`; the code takes the first 30 parishes of a group, so a group of more than 30 would be cut off silently.
+Queries and indexes (`firestore.indexes.json`, now empty):
+- one month: `serviceDays` where `yearMonth == ym` (single field, no composite index); the page filters by parish, group and visibility in the browser.
 
-Security rules (`firestore.rules`): everything is publicly readable except `users` and `admins`. `parishes`, `groups`, `settings` are written only by a superadmin. `services` can be created, changed or deleted only by someone who may edit the parish it belongs to (an admin or superadmin: any; a coordinator: the parishes on their profile; on a change, both the old and the new `parishId`). `users/{uid}`: read by its owner or an admin; created only by its owner as a plain `user`; the owner may refresh name, photo and last sign-in but never the role; roles are changed only by someone else, following the table above; only a superadmin deletes (the profile, not the sign-in account). `admins/{uid}`: read by its owner or a superadmin, never written.
+Security rules (`firestore.rules`): everything is publicly readable except `users` and `admins`. `parishes`, `groups`, `settings` are written only by a superadmin. `serviceDays` can be created, changed or deleted only by someone who may edit the parish it belongs to (an admin or superadmin: any; a coordinator: the parishes on their profile). `serviceTemplates` and `serviceEntryTypes` are readable by coordinators and above and written only by admins and superadmins. `users/{uid}`: read by its owner or an admin; created only by its owner as a plain `user`; the owner may refresh name, photo and last sign-in but never the role; roles are changed only by someone else, following the table above; only a superadmin deletes (the profile, not the sign-in account). `admins/{uid}`: read by its owner or a superadmin, never written.
 
 ## Implementation plan
 

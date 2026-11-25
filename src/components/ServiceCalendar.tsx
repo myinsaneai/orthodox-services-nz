@@ -4,6 +4,7 @@
 // selecting a day opens a panel with the full details underneath.
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Lang } from '../contexts/LangContext';
 import { t } from '../lib/i18n';
 import { daysInMonth, toISO, weekday } from '../lib/dates';
@@ -24,6 +25,12 @@ interface Props {
   entries: Record<string, ParishEntry[]>;
   multi: boolean;
   today: string;
+  /** The day to open first (the schedule editor links here); ignored when it is not in this month. */
+  initialDate?: string | null;
+  /** Replaces the schedule text in the day panel (the schedule editor puts its form here). */
+  renderSchedule?: (date: string, entries: ParishEntry[]) => React.ReactNode;
+  /** Where "Edit this day" goes for a date; null for no link. Display only: the editor checks the role. */
+  editHref?: (date: string) => string | null;
 }
 
 const LEGEND_KINDS = [
@@ -32,8 +39,8 @@ const LEGEND_KINDS = [
 ] as const;
 const LEGEND_FASTS: FastIconType[] = ['strict', 'oilwine', 'fish', 'dairy', 'totalfast'];
 
-export default function ServiceCalendar({ ym, lang, entries, multi, today }: Props) {
-  const [selected, setSelected] = useState<string | null>(null);
+export default function ServiceCalendar({ ym, lang, entries, multi, today, initialDate, renderSchedule, editHref }: Props) {
+  const [selected, setSelected] = useState<string | null>(initialDate && initialDate.startsWith(`${ym}-`) ? initialDate : null);
   const [y, m] = ym.split('-').map(Number);
 
   const lead = (weekday(toISO(y, m, 1)) + 6) % 7;     // blanks before the 1st (Monday-first)
@@ -98,7 +105,7 @@ export default function ServiceCalendar({ ym, lang, entries, multi, today }: Pro
           )}
           <div className="svc-panel__sched">
             <div className="svc-panel__label">{t('serviceSchedule', lang)}</div>
-            {selEntries.length === 0 ? (
+            {renderSchedule ? renderSchedule(selected, selEntries) : selEntries.length === 0 ? (
               <p className="svc-none">{t('noScheduleDay', lang)}</p>
             ) : selEntries.map(e => (
               <div key={e.parishId} className="svc-block">
@@ -106,6 +113,9 @@ export default function ServiceCalendar({ ym, lang, entries, multi, today }: Pro
                 <EntryText text={e.text} />
               </div>
             ))}
+            {editHref && editHref(selected) && (
+              <Link className="svc-btn svc-panel__edit" to={editHref(selected)!}>{t('editThisDay', lang)}</Link>
+            )}
           </div>
           {selDay.tone !== null && <div className="svc-panel__tone">{toneLabel(selDay.tone, lang)}</div>}
           {selDay.nationalDay && <div className="svc-panel__note">{selDay.nationalDay[lang]}</div>}
