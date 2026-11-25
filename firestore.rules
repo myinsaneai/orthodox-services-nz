@@ -70,7 +70,12 @@ service cloud.firestore {
     match /parishes/{id} {
       allow read: if true;
       allow create: if isAdminUp() && parishOk(id) && request.resource.data.groupIds == [];
-      allow update: if isAdminUp() && parishOk(id) && resource.data.slug == request.resource.data.slug;
+      // A full edit must pass parishOk. Moving a parish up or down changes only `order`, which is allowed on any
+      // existing parish (also an older record that does not yet have every field the form now requires).
+      allow update: if isAdminUp() && resource.data.slug == request.resource.data.slug
+                    && (parishOk(id)
+                        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['order'])
+                            && request.resource.data.order is number));
       allow delete: if isAdminUp();
     }
     // Public read; superadmin write (groups, site settings).

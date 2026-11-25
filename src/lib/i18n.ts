@@ -48,7 +48,7 @@ const strings = {
   editParish:      { en: 'Edit', el: 'Επεξεργασία' },
   moveParishUp:    { en: 'Move up', el: 'Μετακίνηση πάνω' },
   moveParishDown:  { en: 'Move down', el: 'Μετακίνηση κάτω' },
-  reorderFailed:   { en: 'Could not change the order. Reload the page and try again.', el: 'Η αλλαγή σειράς δεν ήταν δυνατή. Ανανεώστε τη σελίδα και δοκιμάστε ξανά.' },
+  reorderFailed:   { en: 'Could not change the order.', el: 'Η αλλαγή σειράς δεν ήταν δυνατή.' },
   otherState:      { en: 'Other', el: 'Άλλες' },
   viewMap:         { en: 'View on map', el: 'Δείτε στον χάρτη' },
   aboutHeading:    { en: 'About', el: 'Σχετικά' },

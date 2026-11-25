@@ -46,10 +46,20 @@ describe('firestore.rules', () => {
     const b = block('parishes');
     expect(b).toMatch(/allow read: if true/);
     expect(b).toMatch(/allow create: if isAdminUp\(\) && parishOk\(id\) && request\.resource\.data\.groupIds == \[\]/);
-    expect(b).toMatch(/allow update: if isAdminUp\(\) && parishOk\(id\) && resource\.data\.slug == request\.resource\.data\.slug/);
+    const upd = b.slice(b.indexOf('allow update'), b.indexOf('allow delete'));
+    expect(upd).toMatch(/allow update: if isAdminUp\(\) && resource\.data\.slug == request\.resource\.data\.slug/);
+    expect(upd).toMatch(/parishOk\(id\)/);
     expect(b).toMatch(/allow delete: if isAdminUp\(\)/);
     expect(b).not.toMatch(/isSuperAdmin/);
     expect(b).not.toMatch(/allow write/);
+  });
+  it('parishes: a move up or down may change only `order`, on any existing parish; nothing else escapes parishOk', () => {
+    const upd = block('parishes').slice(block('parishes').indexOf('allow update'), block('parishes').indexOf('allow delete'));
+    expect(upd).toMatch(/\|\|\s*\(request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['order'\]\)/);
+    expect(upd).toMatch(/request\.resource\.data\.order is number/);
+    // the slug check and the admin check apply to both branches (they are outside the parentheses)
+    expect(upd.indexOf('isAdminUp()')).toBeLessThan(upd.indexOf('parishOk'));
+    expect(upd.indexOf('resource.data.slug == request.resource.data.slug')).toBeLessThan(upd.indexOf('parishOk'));
   });
   it('a new parish: only known fields, the id equals the slug, Greek and English names and city required', () => {
     const fn = rules.slice(rules.indexOf('function parishOk'), rules.indexOf('match /parishes/'));

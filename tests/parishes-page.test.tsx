@@ -7,7 +7,7 @@ const h = vi.hoisted(() => ({ parishes: [] as any[], role: null as string | null
 vi.mock('../src/hooks/useRoleHint', () => ({ useRoleHint: () => h.role }));
 vi.mock('../src/lib/firestore', () => ({
   subscribeParishes: (cb: (p: any[]) => void) => { cb(h.parishes); return () => {}; },
-  setParishOrder: async (items: any[]) => { if (h.fail) throw new Error('denied'); h.writes.push(items); },
+  setParishOrder: async (items: any[]) => { if (h.fail) throw Object.assign(new Error('denied'), { code: 'permission-denied' }); h.writes.push(items); },
 }));
 
 import { LangProvider } from '../src/contexts/LangContext';
@@ -200,7 +200,7 @@ describe('grouped by state', () => {
       mount();
       h.fail = true;
       await act(async () => { fireEvent.click(btn('down', 'Auckland')); });
-      expect(screen.getByRole('alert').textContent).toMatch(/Could not change the order/);
+      expect(screen.getByRole('alert').textContent).toBe('Could not change the order. (permission-denied)');
       expect(btn('down', 'Auckland').disabled).toBe(false);
       h.fail = false;
       await act(async () => { fireEvent.click(btn('down', 'Auckland')); });

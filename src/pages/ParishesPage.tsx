@@ -19,7 +19,7 @@ export default function ParishesPage() {
   const [parishes, setParishes] = useState<Parish[]>([]);
 
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState('');            // error code of a refused reorder, '' when fine
 
   useEffect(() => subscribeParishes(setParishes), []);
   // Admin buttons: shown from the stored role hint (display only; the Firestore rules decide who may write).
@@ -30,8 +30,8 @@ export default function ParishesPage() {
   async function move(list: Parish[], index: number, dir: -1 | 1) {
     const changes = moveParishInList(list, index, dir);
     if (changes.length === 0) return;
-    setBusy(true); setFailed(false);
-    try { await setParishOrder(changes); } catch { setFailed(true); } finally { setBusy(false); }
+    setBusy(true); setFailed('');
+    try { await setParishOrder(changes); } catch (e) { setFailed((e as { code?: string })?.code || 'error'); } finally { setBusy(false); }
   }
 
   return (
@@ -46,7 +46,7 @@ export default function ParishesPage() {
       </div>
 
       <div className="page">
-        {failed && <p role="alert" className="svc-error">{t('reorderFailed', lang)}</p>}
+        {failed && <p role="alert" className="svc-error">{t('reorderFailed', lang)} ({failed})</p>}
         {sections.map(({ state, parishes: list }) => (
           <section key={state?.id ?? 'other'} className="ps" aria-labelledby={`ps-${state?.id ?? 'other'}`}>
             <h2 className="ps-h" id={`ps-${state?.id ?? 'other'}`}>
