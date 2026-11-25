@@ -4,7 +4,8 @@
 // Collections
 //   parishes/{parishId}   one doc per parish
 //   groups/{groupId}      named groups of parishes (e.g. "Wellington group")
-//   services/{serviceId}  one doc per service occurrence, tagged with parishId
+//   services/{serviceId}  one doc per service occurrence, tagged with parishId (old structured model)
+//   serviceDays/{parishId}_{date}  one doc per parish per day: free-text schedule in English and Greek
 //   users/{uid}           one profile per signed-in person: role + (coordinators) parishIds
 //   admins/{uid}          retired: only read, once, to carry the first superadmin over to users/{uid}
 //   settings/site         site-wide settings
@@ -163,6 +164,32 @@ export async function saveService(s: Omit<Service, 'updatedAt'>) {
 }
 export async function deleteService(id: string) {
   await deleteDoc(doc(db, 'services', id));
+}
+
+// ─── Service days (free-text schedule per parish per day) ──────────────────────
+
+/** What a parish posts for one day, as text the way it would print it ("9:00 Orthros\n10:00 Divine Liturgy"). */
+export interface ServiceDay {
+  id: string;            // `${parishId}_${date}`
+  parishId: string;
+  date: string;          // "YYYY-MM-DD"
+  yearMonth: string;     // "YYYY-MM" — lets a month be fetched with one equality filter (no composite index)
+  entriesEn: string;
+  entriesEl: string;
+  updatedAt?: unknown;
+}
+
+/** Every posted day of every parish in one month ("YYYY-MM"). Scope and visibility are applied by the caller. */
+export function subscribeServiceDaysForMonth(
+  yearMonth: string,
+  cb: (days: ServiceDay[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, 'serviceDays'), where('yearMonth', '==', yearMonth)),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceDay))),
+    err => onError?.(err),
+  );
 }
 
 // ─── Users and roles ──────────────────────────────────────────────────────────

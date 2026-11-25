@@ -88,6 +88,12 @@ service cloud.firestore {
       allow delete: if canEditParish(resource.data.parishId);
     }
 
+    // Service days: the schedule each parish posts for a day (free text, English and Greek).
+    // Public read. Writing arrives with the admin editor, so for now nothing can write.
+    match /serviceDays/{id} {
+      allow read: if true;
+    }
+
     // ── User profiles ───────────────────────────────────────────────────────
     function newKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
     function textOk(field, max) {

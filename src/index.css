@@ -236,3 +236,112 @@ a { color: inherit; }
 .btn-add { background: var(--color-primary); color: var(--color-cream); font-size: 14px; padding: 8px 16px; }
 .pc-edit { margin-top: 8px; }
 .btn-add:hover, .pc-edit:hover { filter: brightness(0.95); }
+
+/* ── Services: List and Calendar ─────────────────────────────────────────────
+   Day colours and fasting colours are shared with the Russian parish site. */
+:root {
+  --color-feast: #8B0000;      /* weekends, feast names */
+  --color-nzday: #2A7A6A;      /* NZ public holiday text */
+}
+.svc-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.svc-month {
+  flex: 1 1 140px; min-width: 0; text-align: center; margin: 0;
+  font-family: var(--font-display); font-size: 20px; font-weight: 600; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--color-primary);
+}
+.svc-nav, .svc-btn {
+  background: none; border: 1px solid var(--color-accent); border-radius: 3px; cursor: pointer;
+  color: var(--color-primary); font-family: var(--font-body);
+}
+.svc-nav { padding: 6px 14px; font-size: 16px; }
+.svc-btn { padding: 6px 12px; font-size: 13px; }
+.svc-btn--on { background: var(--color-primary); color: var(--color-accent-lt); font-weight: 700; }
+.svc-nav:hover, .svc-btn:hover { background: var(--color-cream); }
+.svc-views { display: flex; border: 1px solid var(--color-accent); border-radius: 3px; overflow: hidden; }
+.svc-views button {
+  padding: 7px 14px; border: none; cursor: pointer; font: inherit; font-size: 12px; letter-spacing: 0.04em;
+  text-transform: uppercase; background: transparent; color: var(--color-primary);
+}
+.svc-views .svc-views__on { background: var(--color-primary); color: var(--color-accent-lt); font-weight: 700; }
+.svc-error { color: #8B0000; }
+.svc-none { color: var(--color-muted); font-style: italic; }
+.svc-note { margin: 10px 0 0; font-size: 12px; color: var(--color-muted); }
+
+/* List */
+.svc-list__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.svc-list__title { flex: 1 1 200px; margin: 0; text-align: center; font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--color-primary); }
+.svc-list__tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.svc-empty { text-align: center; padding: 28px 0; }
+.svc-empty p { color: var(--color-muted); font-style: italic; margin: 0 0 12px; }
+.svc-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.svc-table tr { border-top: 1px solid var(--color-accent); vertical-align: top; }
+.svc-table tbody tr:last-child { border-bottom: 1px solid var(--color-accent); }
+.svc-table__day { padding: 12px 16px 12px 0; width: 30%; min-width: 110px; }
+.svc-table__entries { padding: 12px 0 12px 16px; border-left: 2px solid var(--color-accent); overflow-wrap: anywhere; }
+.svc-table__date { font-weight: 700; font-size: 17px; color: var(--color-primary); }
+.svc-table__date.svc-weekend { color: var(--color-feast); }
+.svc-table__weekday { font-size: 14px; color: var(--color-muted); line-height: 1.3; }
+.svc-table__feast { font-size: 12px; color: var(--color-feast); font-style: italic; margin-top: 3px; line-height: 1.3; }
+.svc-table__nz { font-size: 12px; color: var(--color-nzday); margin-top: 2px; }
+.svc-table__fast { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--color-muted); margin-top: 4px; }
+.svc-line { line-height: 1.6; }
+.svc-block + .svc-block { margin-top: 12px; }
+.svc-block__parish { font-weight: 700; color: var(--color-primary); font-size: 14px; }
+
+/* Calendar */
+.svc-cal__frame { background: #fff; border: 1px solid var(--color-accent); border-radius: 3px; overflow: hidden; }
+.svc-cal__dow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: var(--color-primary); }
+.svc-cal__dow div {
+  text-align: center; padding: 8px 0; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: rgba(255, 255, 255, 0.75);
+}
+.svc-cal__dow .svc-cal__dow--weekend { color: var(--color-accent); }
+.svc-cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--color-accent); padding: 1px; }
+.svc-cell {
+  --cell-bg: #fff; --cell-text: var(--color-text); --cell-weight: 400;
+  position: relative; min-height: 64px; padding: 6px 3px 5px; border: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--cell-bg); color: var(--cell-text); font: inherit;
+}
+.svc-cell--blank { background: var(--color-bg); cursor: default; min-height: 52px; }
+.svc-cell:not(.svc-cell--blank):hover { filter: brightness(0.95); }
+.svc-cell:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.svc-cell--sel { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.svc-cell--today .svc-cell__num { box-shadow: 0 0 0 2px var(--color-primary); border-radius: 50%; padding: 1px 5px; }
+.svc-cell__num { font-family: var(--font-display); font-size: 15px; line-height: 1; font-weight: var(--cell-weight); color: var(--cell-text); }
+.svc-cell--sat:not([data-kind]) .svc-cell__num, .svc-cell--sat[data-kind="plain"] .svc-cell__num { color: var(--color-feast); font-weight: 700; }
+.svc-cell__feast { font-size: 9px; opacity: 0.8; text-align: center; line-height: 1.2; overflow-wrap: anywhere; padding: 0 2px; }
+.svc-cell__fast { position: absolute; top: 3px; left: 3px; display: flex; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25)); }
+.svc-cell__church { position: absolute; bottom: 2px; right: 2px; display: flex; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25)); }
+.svc-cell__nz, .svc-nzmark {
+  position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid;
+  border-width: 0 15px 15px 0; border-color: transparent var(--color-feast) transparent transparent;
+}
+.svc-nzmark { position: static; display: inline-block; border-width: 0 11px 11px 0; }
+@media (max-width: 640px) {
+  .svc-cell { min-height: 56px; }
+  .svc-cell__feast { display: none; }                          /* names are in the day panel; cells are too small */
+  .svc-cell__num { align-self: flex-end; margin-right: 4px; }  /* keep clear of the fasting icon */
+  .svc-cell__fast svg, .svc-cell__church svg { width: 16px; height: 16px; }
+}
+.svc-cell[data-kind="pascha"], .svc-swatch[data-kind="pascha"] { --cell-bg: #FFF0D0; --cell-text: #8B0000; --cell-weight: 700; }
+.svc-cell[data-kind="holyweek"], .svc-swatch[data-kind="holyweek"] { --cell-bg: #F5E8E0; --cell-text: #6A2010; }
+.svc-cell[data-kind="bright"], .svc-swatch[data-kind="bright"] { --cell-bg: #FFFAE0; --cell-text: #7A5A00; }
+.svc-cell[data-kind="palm"], .svc-cell[data-kind="pentecost"], .svc-swatch[data-kind="palm"] { --cell-bg: #EEF5E8; --cell-text: #2E5820; --cell-weight: 700; }
+.svc-cell[data-kind="nativity"], .svc-swatch[data-kind="nativity"] { --cell-bg: #EAF0FA; --cell-text: #1E3870; --cell-weight: 700; }
+.svc-cell[data-kind="great"], .svc-swatch[data-kind="great"] { --cell-bg: #FDE8E8; --cell-text: #7A1010; --cell-weight: 700; }
+.svc-cell[data-kind="sunday"] { --cell-text: var(--color-feast); --cell-weight: 700; }
+.svc-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; border: 1px solid #ccc; background: var(--cell-bg, #fff); flex-shrink: 0; }
+
+.svc-panel { margin-top: 16px; background: #fff; border: 1px solid var(--color-accent); border-radius: 3px; padding: 18px 22px; }
+.svc-panel__date { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-primary); }
+.svc-panel__feast { margin-top: 4px; font-size: 14px; font-style: italic; color: var(--color-feast); }
+.svc-panel__sched { margin: 10px 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-accent); }
+.svc-panel__label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 6px; }
+.svc-panel__tone { font-size: 13px; font-weight: 600; color: var(--color-primary); }
+.svc-panel__note, .svc-panel__nz { margin-top: 3px; font-size: 13px; color: var(--color-nzday); }
+.svc-panel__fast { margin-top: 4px; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.svc-panel__fast small { font-size: 12px; opacity: 0.85; }
+
+.svc-legend { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11px; color: var(--color-muted); }
+.svc-legend span { display: inline-flex; align-items: center; gap: 5px; }

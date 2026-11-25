@@ -1,19 +1,23 @@
 // src/pages/SchedulePage.tsx
-// Services view. One page, three scopes selected via the URL:
-//   /services                  → all parishes
-//   /services?group=<slug>     → a named group of parishes
-//   /services?parish=<slug>    → a single parish
+// Services: the posted schedules, as a List or a Calendar, for one month at a time. The URL holds
+// the selection, so a view can be shared or bookmarked:
+//   /services                          all parishes, current month, list
+//   ?group=<slug>  /  ?parish=<slug>   a named group of parishes / a single parish
+//   ?month=2026-12                     the month (default: this month, New Zealand time)
+//   ?view=calendar                     the calendar grid (default: list)
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useLang } from '../contexts/LangContext';
 import { t } from '../lib/i18n';
-import {
-  subscribeParishes, subscribeGroups, subscribeUpcomingServices,
-} from '../lib/firestore';
-import type { Parish, Group, Service } from '../lib/firestore';
-import { DEFAULT_PARISH_ACCENT } from '../themes/tokens';
-import { todayNZ, formatWhen, resolveScope, scopeKey, visibleServices } from '../lib/schedule';
+import { subscribeParishes, subscribeGroups, subscribeServiceDaysForMonth } from '../lib/firestore';
+import type { Parish, Group, ServiceDay } from '../lib/firestore';
+import { todayNZ, resolveScope } from '../lib/schedule';
+import { addMonths, isMonth, monthOf } from '../lib/dates';
+import { monthTitle } from '../lib/monthFormat';
+import { entriesByDate } from '../lib/serviceDays';
+import ServiceList from '../components/ServiceList';
+import ServiceCalendar from '../components/ServiceCalendar';
 
 const chip = (active: boolean): React.CSSProperties => ({
   fontSize: 12, padding: '4px 10px', borderRadius: 14, cursor: 'pointer',
@@ -23,19 +27,24 @@ const chip = (active: boolean): React.CSSProperties => ({
   border: active ? '0.5px solid var(--color-primary)' : '0.5px solid var(--color-card-border)',
 });
 
+interface Loaded { ym: string; days: ServiceDay[]; error: boolean }
+
 export default function SchedulePage() {
   const { lang } = useLang();
   const [params, setParams] = useSearchParams();
   const [parishes, setParishes] = useState<Parish[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [loadingServices, setLoadingServices] = useState(true);
-  // Until the parish list has arrived, a ?parish= / ?group= slug cannot be
-  // resolved, so show "Loading…" instead of a false "No upcoming services".
+  // Until the parish list has arrived, a ?parish= / ?group= slug cannot be resolved.
   const [parishesLoaded, setParishesLoaded] = useState(false);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const groupSlug = params.get('group');
   const parishSlug = params.get('parish');
+  const view = params.get('view') === 'calendar' ? 'calendar' : 'list';
+  const today = useMemo(() => todayNZ(), []);
+  const monthParam = params.get('month');
+  const ym = isMonth(monthParam) ? monthParam : monthOf(today);
 
   useEffect(() => {
     const u1 = subscribeParishes(p => { setParishes(p); setParishesLoaded(true); });
@@ -43,38 +52,37 @@ export default function SchedulePage() {
     return () => { u1(); u2(); };
   }, []);
 
-  const visibleParishes = useMemo(() => parishes.filter(p => p.visible), [parishes]);
-  const parishById = useMemo(
-    () => Object.fromEntries(parishes.map(p => [p.id, p])) as Record<string, Parish>,
-    [parishes],
+  useEffect(
+    () => subscribeServiceDaysForMonth(
+      ym,
+      days => setLoaded({ ym, days, error: false }),
+      () => setLoaded({ ym, days: [], error: true }),
+    ),
+    [ym],
   );
+  const loading = loaded?.ym !== ym || !parishesLoaded;
 
-  // Resolve the URL selection to a Firestore scope.
+  const visibleParishes = useMemo(() => parishes.filter(p => p.visible), [parishes]);
   const scope = useMemo(
     () => resolveScope({ parishSlug, groupSlug }, parishes, groups),
     [parishSlug, groupSlug, parishes, groups],
   );
-  const key = scopeKey(scope);
-  const unresolved = scope === null && !parishesLoaded;
+  const entries = useMemo(
+    () => entriesByDate(loaded?.ym === ym ? loaded.days : [], parishes, scope, lang),
+    [loaded, ym, parishes, scope, lang],
+  );
+  // A single parish needs no parish names; "all" and groups do.
+  const multi = scope === 'all' || (Array.isArray(scope) && scope.length > 1);
 
-  useEffect(() => {
-    if (scope === null) {
-      setServices([]);
-      setLoadingServices(unresolved);
-      return;
-    }
-    setLoadingServices(true);
-    const unsub = subscribeUpcomingServices(scope, todayNZ(), s => {
-      setServices(s);
-      setLoadingServices(false);
-    });
-    return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, unresolved]);
-
-  const shown = useMemo(() => visibleServices(services, parishes), [services, parishes]);
-
-  const select = (next: Record<string, string>) => setParams(next, { replace: true });
+  // Change one part of the selection and keep the others.
+  const update = (changes: Record<string, string | null>) => {
+    const next = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(changes)) { if (v === null) next.delete(k); else next.set(k, v); }
+    setParams(next, { replace: true });
+  };
+  const selectScope = (next: { group?: string; parish?: string }) =>
+    update({ group: next.group ?? null, parish: next.parish ?? null });
+  const goMonth = (target: string) => update({ month: target === monthOf(today) ? null : target });
 
   return (
     <>
@@ -85,13 +93,13 @@ export default function SchedulePage() {
 
       <div className="page">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
-          <button type="button" style={chip(!groupSlug && !parishSlug)} onClick={() => select({})}>
+          <button type="button" style={chip(!groupSlug && !parishSlug)} onClick={() => selectScope({})}>
             {t('allParishes', lang)}
           </button>
           {groups.map(g => (
             <button
               key={g.id} type="button" style={chip(groupSlug === g.slug)}
-              onClick={() => select({ group: g.slug })}
+              onClick={() => selectScope({ group: g.slug })}
             >
               {lang === 'el' ? g.nameEl : g.nameEn}
             </button>
@@ -100,7 +108,7 @@ export default function SchedulePage() {
             <select
               aria-label={t('navParishes', lang)}
               value={parishSlug ?? ''}
-              onChange={e => (e.target.value ? select({ parish: e.target.value }) : select({}))}
+              onChange={e => selectScope(e.target.value ? { parish: e.target.value } : {})}
               style={{ ...chip(!!parishSlug), appearance: 'auto' }}
             >
               <option value="">{t('navParishes', lang)}…</option>
@@ -111,38 +119,37 @@ export default function SchedulePage() {
           )}
         </div>
 
-        {loadingServices ? (
-          <p style={{ color: 'var(--color-muted)' }}>{t('loading', lang)}</p>
-        ) : shown.length === 0 ? (
-          <p style={{ color: 'var(--color-muted)' }}>{t('noServices', lang)}</p>
-        ) : (
-          <div className="cards-grid">
-            {shown.map(s => {
-              const parish = parishById[s.parishId];
-              const parishName = parish ? (lang === 'el' ? parish.nameEl : parish.nameEn) : '';
-              const title = lang === 'el' ? s.titleEl || s.titleEn : s.titleEn;
-              const notes = lang === 'el' ? s.notesEl || s.notesEn : s.notesEn;
-              return (
-                <div key={s.id} style={{
-                  display: 'flex', gap: 10, alignItems: 'stretch', padding: '10px 12px',
-                  border: '0.5px solid var(--color-card-border)', borderRadius: 8,
-                  background: 'var(--color-card-bg)',
-                }}>
-                  <div style={{
-                    width: 4, borderRadius: 2,
-                    background: parish?.accentColor || DEFAULT_PARISH_ACCENT,
-                  }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>
-                      {parishName}{parishName && ' — '}{title}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{formatWhen(s, lang)}</div>
-                    {notes && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{notes}</div>}
-                  </div>
-                </div>
-              );
-            })}
+        <div className="svc-toolbar">
+          <button type="button" className="svc-nav" aria-label={t('prevMonth', lang)} onClick={() => goMonth(addMonths(ym, -1))}>←</button>
+          <h2 className="svc-month" aria-live="polite">{monthTitle(ym, lang)}</h2>
+          <button type="button" className="svc-nav" aria-label={t('nextMonth', lang)} onClick={() => goMonth(addMonths(ym, 1))}>→</button>
+          {ym !== monthOf(today) && (
+            <button type="button" className="svc-btn" onClick={() => goMonth(monthOf(today))}>{t('thisMonth', lang)}</button>
+          )}
+          <div className="svc-views" role="group">
+            {(['list', 'calendar'] as const).map(v => (
+              <button
+                key={v} type="button" aria-pressed={view === v}
+                className={view === v ? 'svc-views__on' : undefined}
+                onClick={() => update({ view: v === 'list' ? null : v })}
+              >
+                {t(v === 'list' ? 'viewList' : 'viewCalendar', lang)}
+              </button>
+            ))}
           </div>
+        </div>
+
+        {loading ? (
+          <p style={{ color: 'var(--color-muted)' }}>{t('loading', lang)}</p>
+        ) : loaded?.error ? (
+          <p role="alert" className="svc-error">{t('scheduleLoadFailed', lang)}</p>
+        ) : view === 'list' ? (
+          <ServiceList
+            key={ym} ym={ym} lang={lang} entries={entries} multi={multi}
+            showAll={showAll} onToggleShowAll={() => setShowAll(s => !s)}
+          />
+        ) : (
+          <ServiceCalendar key={ym} ym={ym} lang={lang} entries={entries} multi={multi} today={today} />
         )}
       </div>
     </>

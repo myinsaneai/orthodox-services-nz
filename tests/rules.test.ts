@@ -25,7 +25,7 @@ function block(name: string): string {
 
 describe('firestore.rules', () => {
   it('the code uses the expected collections', () => {
-    expect([...used].sort()).toEqual(['admins', 'groups', 'parishes', 'services', 'settings', 'users']);
+    expect([...used].sort()).toEqual(['admins', 'groups', 'parishes', 'serviceDays', 'services', 'settings', 'users']);
   });
   it('every collection the code touches has a rule block', () => {
     used.forEach(c => expect(matched.has(c), `no rule for "${c}"`).toBe(true));

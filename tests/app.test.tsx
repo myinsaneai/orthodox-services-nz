@@ -20,7 +20,7 @@ vi.mock('../src/lib/firebaseAdmin', () => ({ auth: {}, storage: {} }));
 vi.mock('../src/lib/firestore', () => ({
   subscribeParishes: (cb: any) => { cb([]); return () => {}; },
   subscribeGroups: (cb: any) => { cb([]); return () => {}; },
-  subscribeUpcomingServices: (_s: any, _f: any, cb: any) => { cb([]); return () => {}; },
+  subscribeServiceDaysForMonth: (_ym: any, cb: any) => { cb([]); return () => {}; },
   ensureUserProfile: async () => { if (h.fail) throw new Error('offline'); return h.profile; },
   listUserProfiles: async () => h.users,
   updateOwnProfile: async () => {},
