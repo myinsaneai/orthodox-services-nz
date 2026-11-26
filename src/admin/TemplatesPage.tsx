@@ -11,11 +11,15 @@ import {
   deleteServiceTemplate, deleteServiceEntryType, setLibraryOrder, newLibraryId,
 } from '../lib/firestore';
 import type { ServiceTemplate, ServiceEntryType } from '../lib/firestore';
+import TranslateBar from './TranslateBar';
 import {
   DAY_TEXT_MAX, NAME_MAX, LINE_MAX, nextOrder, moveItem, templateComplete, entryTypeComplete,
 } from '../lib/scheduleDocs';
 
 interface Field<T> { key: keyof T & string; label: string; max: number; multiline?: boolean; required?: boolean; lang?: 'en' | 'el' }
+
+/** Two boxes of the form that hold the same text in English and in Greek, and get a Translate bar under them. */
+interface Pair<T> { en: keyof T & string; el: keyof T & string; what?: string }
 
 interface SectionProps<T extends { id: string; order: number }> {
   title: string;
@@ -25,6 +29,7 @@ interface SectionProps<T extends { id: string; order: number }> {
   items: T[] | null;                             // null while loading
   failed: boolean;
   fields: Field<T>[];
+  pairs: Pair<T>[];
   complete: (item: T) => boolean;
   primary: (item: T) => string;
   secondary: (item: T) => string;
@@ -92,18 +97,33 @@ function LibrarySection<T extends { id: string; order: number }>(p: SectionProps
 
       {draft ? (
         <form className="ed-form" onSubmit={e => { e.preventDefault(); if (p.complete(draft)) run(() => p.onSave(draft), () => setDraft(null)); }}>
-          {p.fields.map(f => (
-            <label key={f.key} className="pf-field">
-              <span>{f.label}</span>
-              {f.multiline ? (
-                <textarea rows={6} value={String(draft[f.key] ?? '')} maxLength={f.max} lang={f.lang}
-                          onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} />
-              ) : (
-                <input type="text" value={String(draft[f.key] ?? '')} maxLength={f.max} lang={f.lang}
-                       onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} />
-              )}
-            </label>
-          ))}
+          {p.fields.map(f => {
+            const pair = p.pairs.find(x => x.el === f.key);
+            const maxOf = (key: string) => p.fields.find(x => x.key === key)?.max ?? 0;
+            return (
+              <div key={f.key}>
+                <label className="pf-field">
+                  <span>{f.label}</span>
+                  {f.multiline ? (
+                    <textarea rows={6} value={String(draft[f.key] ?? '')} maxLength={f.max} lang={f.lang}
+                              onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} />
+                  ) : (
+                    <input type="text" value={String(draft[f.key] ?? '')} maxLength={f.max} lang={f.lang}
+                           onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} />
+                  )}
+                </label>
+                {pair && (
+                  <TranslateBar
+                    what={pair.what}
+                    en={String(draft[pair.en] ?? '')} el={String(draft[pair.el] ?? '')}
+                    maxEn={maxOf(pair.en)} maxEl={maxOf(pair.el)}
+                    setEn={v => setDraft(d => (d ? { ...d, [pair.en]: v } : d))}
+                    setEl={v => setDraft(d => (d ? { ...d, [pair.el]: v } : d))}
+                  />
+                )}
+              </div>
+            );
+          })}
           {error && <p role="alert" className="um-error">{error}</p>}
           <div className="um-actions">
             <button type="submit" className="um-btn um-btn--primary" disabled={busy || !p.complete(draft)}>
@@ -159,6 +179,7 @@ export default function TemplatesPage() {
             { key: 'entriesEn', label: 'Schedule (English)', max: DAY_TEXT_MAX, multiline: true, lang: 'en' },
             { key: 'entriesEl', label: 'Πρόγραμμα (Ελληνικά)', max: DAY_TEXT_MAX, multiline: true, lang: 'el' },
           ]}
+          pairs={[{ en: 'nameEn', el: 'nameEl', what: 'name' }, { en: 'entriesEn', el: 'entriesEl', what: 'schedule' }]}
           complete={templateComplete}
           primary={t => t.nameEn}
           secondary={t => oneLine(t.entriesEn) || '(no English text)'}
@@ -178,6 +199,7 @@ export default function TemplatesPage() {
             { key: 'textEn', label: 'Line (English)', max: LINE_MAX, required: true, lang: 'en' },
             { key: 'textEl', label: 'Γραμμή (Ελληνικά)', max: LINE_MAX, required: true, lang: 'el' },
           ]}
+          pairs={[{ en: 'textEn', el: 'textEl' }]}
           complete={entryTypeComplete}
           primary={e => e.textEn}
           secondary={e => e.textEl}

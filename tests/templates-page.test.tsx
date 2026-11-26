@@ -9,6 +9,7 @@ const h: any = vi.hoisted(() => { const h: any = {
   fail: false,
   err: null as any,
   calls: [] as any[],
+  translate: (async () => '') as (...a: any[]) => Promise<string>,
 }; h.rec = (name: string) => async (...a: any[]) => { if (h.err) throw h.err; h.calls.push([name, ...a]); }; return h; });
 vi.mock('../src/lib/firestore', () => ({
   subscribeServiceTemplates: (cb: any, onError: any) => { if (h.fail) onError(new Error('x')); else cb(h.templates); return () => {}; },
@@ -19,6 +20,11 @@ vi.mock('../src/lib/firestore', () => ({
   deleteServiceTemplate: h.rec('deleteTemplate'),
   deleteServiceEntryType: h.rec('deleteEntry'),
   setLibraryOrder: h.rec('order'),
+}));
+
+vi.mock('../src/admin/translate', () => ({
+  translateText: (...a: any[]) => h.translate(...a),
+  translateFailure: (e: any) => `fail:${e?.code ?? 'x'}`,
 }));
 
 import TemplatesPage from '../src/admin/TemplatesPage';
@@ -34,6 +40,7 @@ beforeEach(() => {
   h.templates = [tpl('t1', 'Sunday', 0), tpl('t2', 'Feast', 1), tpl('t3', 'Weekday', 2)];
   h.entryTypes = [{ id: 'e1', textEn: '18:00 Vespers', textEl: '18:00 Εσπερινός', order: 0 }];
   h.fail = false; h.err = null; h.calls = [];
+  h.translate = async (text: string, from: string) => `[${from}] ${text}`;
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -138,5 +145,35 @@ describe('Templates page', () => {
     await act(async () => { fireEvent.click(within(s).getByRole('button', { name: 'Save' })); });
     expect(within(s).getByRole('alert').textContent).toMatch(/Could not save/);
     expect(within(s).getByLabelText('Line (English)')).toBeTruthy();
+  });
+
+  it('translates the name and the schedule of a template, each with its own buttons', async () => {
+    mount();
+    const s = section('Full-day templates');
+    fireEvent.click(within(s).getByRole('button', { name: 'Add template' }));
+    fill(s, 'Name (English)', 'Vigil');
+    fill(s, 'Schedule (English)', '18:00 Vigil');
+    await act(async () => { fireEvent.click(within(s).getByRole('button', { name: 'Translate name English → Greek' })); });
+    expect((within(s).getByLabelText('Όνομα (Ελληνικά)') as HTMLInputElement).value).toBe('[en] Vigil');
+    await act(async () => { fireEvent.click(within(s).getByRole('button', { name: 'Translate schedule English → Greek' })); });
+    expect((within(s).getByLabelText('Πρόγραμμα (Ελληνικά)') as HTMLTextAreaElement).value).toBe('[en] 18:00 Vigil');
+    expect((within(s).getByLabelText('Name (English)') as HTMLInputElement).value).toBe('Vigil');   // untouched
+    const save = within(s).getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
+    expect(h.calls).toEqual([]);                                                                   // nothing saved yet
+  });
+  it('a quick entry gets one pair of buttons and the Greek line is limited to 200 characters', async () => {
+    mount();
+    const s = section('Quick entries');
+    fireEvent.click(within(s).getByRole('button', { name: 'Add quick entry' }));
+    fill(s, 'Line (English)', '9:00 Orthros');
+    h.translate = async () => 'Ό'.repeat(201);
+    await act(async () => { fireEvent.click(within(s).getByRole('button', { name: 'Translate English → Greek' })); });
+    expect(within(s).getByRole('alert').textContent).toMatch(/200 characters/);
+    h.translate = async () => '9:00 Όρθρος';
+    await act(async () => { fireEvent.click(within(s).getByRole('button', { name: 'Translate English → Greek' })); });
+    expect((within(s).getByLabelText('Γραμμή (Ελληνικά)') as HTMLInputElement).value).toBe('9:00 Όρθρος');
+    await act(async () => { fireEvent.click(within(s).getByRole('button', { name: 'Save' })); });
+    expect(h.calls[0][1]).toMatchObject({ textEn: '9:00 Orthros', textEl: '9:00 Όρθρος' });
   });
 });

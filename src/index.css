@@ -369,6 +369,8 @@ a { color: inherit; }
 .ed-box--add { background: #f0f5ee; border-color: #c4d6bf; }
 .ed-box__title { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 8px; }
 .ed-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ed-translate { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 10px; }
+.ed-translate .um-error { flex-basis: 100%; margin: 0; }
 .ed-cols { display: grid; grid-template-columns: 1fr; gap: 0 16px; }
 @media (min-width: 640px) { .ed-cols { grid-template-columns: 1fr 1fr; } }
 .ed-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }

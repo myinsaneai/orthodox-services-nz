@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   saved: [] as any[],
   deleted: [] as any[],
   saveError: null as any,
+  translate: (async () => '') as (...a: any[]) => Promise<string>,
 }));
 vi.mock('../src/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -29,6 +30,11 @@ vi.mock('../src/lib/firestore', () => ({
   subscribeServiceEntryTypes: (cb: any, onError: any) => { if (h.libFail) onError(new Error('x')); else cb(h.entryTypes); return () => {}; },
   saveServiceDay: async (...a: any[]) => { if (h.saveError) throw h.saveError; h.saved.push(a); },
   deleteServiceDay: async (...a: any[]) => { if (h.saveError) throw h.saveError; h.deleted.push(a); },
+}));
+
+vi.mock('../src/admin/translate', () => ({
+  translateText: (...a: any[]) => h.translate(...a),
+  translateFailure: (e: any) => `fail:${e?.code ?? 'x'}`,
 }));
 
 import { LangProvider } from '../src/contexts/LangContext';
@@ -70,6 +76,7 @@ beforeEach(() => {
   ];
   h.entryTypes = [{ id: 'e1', textEn: '18:00 Vespers', textEl: '18:00 Εσπερινός', order: 0 }];
   h.libFail = false; h.months = []; h.saved = []; h.deleted = []; h.saveError = null; seen.url = '';
+  h.translate = async (text: string, from: string) => `[${from}] ${text}`;
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -232,5 +239,79 @@ describe('editing a day', () => {
     const panel = container.querySelector('.svc-panel') as HTMLElement;
     expect(within(panel).getByText(/St Catherine the Great Martyr/)).toBeTruthy();
     expect(within(panel).getByText(/Strict fast/)).toBeTruthy();
+  });
+});
+
+describe('translating a day', () => {
+  const open = () => { const r = mount(); fireEvent.click(cell(r.container, '2026-11-24')); return r; };
+  const flush = async () => { await act(async () => { await new Promise(r => setTimeout(r, 0)); }); };
+
+  it('both buttons are off while their source box is empty', () => {
+    open();
+    expect((screen.getByRole('button', { name: 'Translate English → Greek' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Translate Greek → English' }) as HTMLButtonElement).disabled).toBe(true);
+    type(en(), '9:00 Orthros');
+    expect((screen.getByRole('button', { name: 'Translate English → Greek' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Translate Greek → English' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it('English → Greek fills the Greek box, marks the day as changed and does not save', async () => {
+    open();
+    type(en(), '9:00 Orthros\n10:00 Divine Liturgy');
+    const calls: any[] = [];
+    h.translate = async (...a: any[]) => { calls.push(a); return '9:00 Όρθρος\n10:00 Θεία Λειτουργία'; };
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Translate English → Greek' })); });
+    expect(calls).toEqual([['9:00 Orthros\n10:00 Divine Liturgy', 'en']]);
+    expect(el().value).toBe('9:00 Όρθρος\n10:00 Θεία Λειτουργία');
+    expect(screen.getByText(/Please read it through before saving/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save & publish' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(h.saved).toEqual([]);
+  });
+  it('Greek → English fills the English box', async () => {
+    open();
+    type(el(), '18:00 Εσπερινός');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Translate Greek → English' })); });
+    expect(en().value).toBe('[el] 18:00 Εσπερινός');
+  });
+  it('asks before replacing text that is already there, and No keeps it', async () => {
+    open();
+    type(en(), 'Liturgy'); type(el(), 'Λειτουργία');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Translate English → Greek' })); });
+    expect(el().value).toBe('Λειτουργία');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Translate English → Greek' })); });
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(el().value).toBe('[en] Liturgy');
+  });
+  it('shows the failure, keeps both boxes, and can be tried again', async () => {
+    open();
+    type(en(), 'Liturgy');
+    h.translate = async () => { throw { code: 'functions/resource-exhausted' }; };
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Translate English → Greek' })); });
+    expect(screen.getByRole('alert').textContent).toBe('fail:functions/resource-exhausted');
+    expect(el().value).toBe('');
+    h.translate = async () => 'Λειτουργία';
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Translate English → Greek' })); });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(el().value).toBe('Λειτουργία');
+  });
+  it('refuses a translation longer than the box allows', async () => {
+    open();
+    type(en(), 'Liturgy');
+    h.translate = async () => 'Λ'.repeat(4001);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Translate English → Greek' })); });
+    expect(screen.getByRole('alert').textContent).toMatch(/longer than the Greek box allows \(4000 characters\)/);
+    expect(el().value).toBe('');
+  });
+  it('text typed in the other box while waiting is not lost', async () => {
+    open();
+    type(en(), 'Liturgy');
+    let release!: (v: string) => void;
+    h.translate = () => new Promise<string>(r => { release = r; });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Translate English → Greek' })); });
+    expect((screen.getByRole('button', { name: 'Translating…' }) as HTMLButtonElement).disabled).toBe(true);
+    type(en(), 'Liturgy and more');                              // typing continues in the source box
+    await act(async () => { release('Λειτουργία'); await flush(); });
+    expect(en().value).toBe('Liturgy and more');
+    expect(el().value).toBe('Λειτουργία');
   });
 });

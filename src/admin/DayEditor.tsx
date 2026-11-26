@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { saveServiceDay, deleteServiceDay } from '../lib/firestore';
 import type { Parish, ServiceDay, ServiceTemplate, ServiceEntryType } from '../lib/firestore';
 import { appendLine, cleanText, DAY_TEXT_MAX } from '../lib/scheduleDocs';
+import TranslateBar from './TranslateBar';
 
 interface Props {
   parish: Parish;
@@ -35,6 +36,9 @@ export default function DayEditor({ parish, date, day, templates, entryTypes, li
   const hasSaved = base.en !== '' || base.el !== '';
 
   const edit = (en2: string, el2: string) => { setEn(en2); setEl(el2); setSaved(false); setError(''); };
+  // Used when a translation arrives: changes one box only, whatever was typed in the other meanwhile.
+  const putEn = (v: string) => { setEn(v); setSaved(false); setError(''); };
+  const putEl = (v: string) => { setEl(v); setSaved(false); setError(''); };
 
   async function save() {
     setBusy(true); setError('');
@@ -102,6 +106,7 @@ export default function DayEditor({ parish, date, day, templates, entryTypes, li
                     onChange={e => edit(en, e.target.value)} />
         </label>
       </div>
+      <TranslateBar en={en} el={el} maxEn={DAY_TEXT_MAX} maxEl={DAY_TEXT_MAX} setEn={putEn} setEl={putEl} />
       <p className="um-muted">
         One service per line; times such as 9:30 are shown in bold. If one language is left empty, visitors
         see the other one.

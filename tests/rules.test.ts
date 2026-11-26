@@ -47,19 +47,21 @@ describe('firestore.rules', () => {
     expect(b).toMatch(/allow read: if true/);
     expect(b).toMatch(/allow create: if isAdminUp\(\) && parishOk\(id\) && request\.resource\.data\.groupIds == \[\]/);
     const upd = b.slice(b.indexOf('allow update'), b.indexOf('allow delete'));
-    expect(upd).toMatch(/allow update: if isAdminUp\(\) && resource\.data\.slug == request\.resource\.data\.slug/);
-    expect(upd).toMatch(/parishOk\(id\)/);
+    expect(upd).toMatch(/allow update: if isAdminUp\(\)\s*&&/);
+    expect(upd).toMatch(/resource\.data\.slug == request\.resource\.data\.slug && parishOk\(id\)/);
     expect(b).toMatch(/allow delete: if isAdminUp\(\)/);
     expect(b).not.toMatch(/isSuperAdmin/);
     expect(b).not.toMatch(/allow write/);
   });
   it('parishes: a move up or down may change only `order`, on any existing parish; nothing else escapes parishOk', () => {
-    const upd = block('parishes').slice(block('parishes').indexOf('allow update'), block('parishes').indexOf('allow delete'));
-    expect(upd).toMatch(/\|\|\s*\(request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['order'\]\)/);
+    const b = block('parishes');
+    const upd = b.slice(b.indexOf('allow update'), b.indexOf('allow delete'));
+    expect(upd).toMatch(/request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['order'\]\)/);
     expect(upd).toMatch(/request\.resource\.data\.order is number/);
-    // the slug check and the admin check apply to both branches (they are outside the parentheses)
-    expect(upd.indexOf('isAdminUp()')).toBeLessThan(upd.indexOf('parishOk'));
-    expect(upd.indexOf('resource.data.slug == request.resource.data.slug')).toBeLessThan(upd.indexOf('parishOk'));
+    // admin check first; order-only branch before the full check; the slug rule belongs to the full check only
+    expect(upd.indexOf('isAdminUp()')).toBeLessThan(upd.indexOf('affectedKeys'));
+    expect(upd.indexOf('affectedKeys')).toBeLessThan(upd.indexOf('parishOk(id)'));
+    expect(upd.indexOf('resource.data.slug == request.resource.data.slug')).toBeGreaterThan(upd.indexOf('affectedKeys'));
   });
   it('a new parish: only known fields, the id equals the slug, Greek and English names and city required', () => {
     const fn = rules.slice(rules.indexOf('function parishOk'), rules.indexOf('match /parishes/'));

@@ -88,8 +88,20 @@ export function subscribeParishes(cb: (p: Parish[]) => void): Unsubscribe {
 export async function saveParish(p: Parish) {
   await setDoc(doc(db, 'parishes', p.id), p, { merge: true });
 }
-/** Rewrites only the `order` of the given parishes (after a move up or down; admins). The rules check the whole record. */
+/**
+ * The public pages load Firestore without any sign-in code (that keeps firebase/auth out of a visitor's
+ * download), so a write sent from such a page would reach Firestore with no user and the rules would refuse
+ * it. Before writing from a public page, load the sign-in code and wait until the saved sign-in is restored.
+ * Only admins get here (the buttons are theirs), so visitors never download it.
+ */
+async function signedInForWrite(): Promise<void> {
+  const { auth } = await import('./firebaseAdmin');
+  await auth.authStateReady();
+}
+
+/** Rewrites only the `order` of the given parishes (after a move up or down; admins). Rules: an admin may change `order` alone. */
 export async function setParishOrder(items: { id: string; order: number }[]) {
+  await signedInForWrite();
   const batch = writeBatch(db);
   items.forEach(i => batch.update(doc(db, 'parishes', i.id), { order: i.order }));
   await batch.commit();
