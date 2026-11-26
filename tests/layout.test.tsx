@@ -31,11 +31,11 @@ describe('header', () => {
     const order = [...header.querySelectorAll('img, div')].map(e => e.tagName === 'IMG' ? (e as HTMLImageElement).alt : '');
     expect(order.indexOf('Ecumenical Patriarchate')).toBeLessThan(order.indexOf('Holy Metropolis of New Zealand'));
   });
-  it('has exactly Services, Parishes, About and the language switch', () => {
+  it('has exactly Calendar, Parishes, About and the language switch', () => {
     mount();
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     const links = within(nav).getAllByRole('link');
-    expect(links.map(a => a.textContent)).toEqual(['Services', 'Parishes', 'About']);
+    expect(links.map(a => a.textContent)).toEqual(['Calendar', 'Parishes', 'About']);
     expect(links.map(a => a.getAttribute('href'))).toEqual(['/services', '/parishes', '/about']);
     expect(within(nav).getAllByRole('button')).toHaveLength(1);
   });
@@ -43,7 +43,7 @@ describe('header', () => {
     mount('/parishes');
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(within(nav).getByText('Parishes').getAttribute('aria-current')).toBe('page');
-    expect(within(nav).getByText('Services').getAttribute('aria-current')).toBeNull();
+    expect(within(nav).getByText('Calendar').getAttribute('aria-current')).toBeNull();
   });
   it('uses the layout classes that the responsive CSS targets', () => {
     mount();
@@ -68,13 +68,13 @@ describe('language', () => {
   it('starts in Greek for a Greek browser when nothing is saved', () => {
     setBrowserLang('el-GR');
     mount();
-    expect(screen.getByText('Ακολουθίες')).toBeTruthy();
+    expect(screen.getByText('Ημερολόγιο')).toBeTruthy();
     expect(document.documentElement.lang).toBe('el');
   });
   it('switches to Greek, remembers it, and switches back', () => {
     const { unmount } = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Switch to Greek' }));
-    expect(screen.getByText('Ακολουθίες')).toBeTruthy();
+    expect(screen.getByText('Ημερολόγιο')).toBeTruthy();
     expect(screen.getByText('Ενορίες')).toBeTruthy();
     expect(screen.getByText('Σχετικά')).toBeTruthy();
     expect(document.documentElement.lang).toBe('el');
@@ -82,17 +82,17 @@ describe('language', () => {
 
     unmount();           // a new visit
     mount();
-    expect(screen.getByText('Ακολουθίες')).toBeTruthy();
+    expect(screen.getByText('Ημερολόγιο')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to English' }));
-    expect(screen.getByText('Services')).toBeTruthy();
+    expect(screen.getByText('Calendar')).toBeTruthy();
     expect(localStorage.getItem('gp_lang')).toBe('en');
   });
   it('a saved choice beats the browser language', () => {
     setBrowserLang('el-GR');
     localStorage.setItem('gp_lang', 'en');
     mount();
-    expect(screen.getByText('Services')).toBeTruthy();
+    expect(screen.getByText('Calendar')).toBeTruthy();
   });
   it('ignores a junk saved value', () => {
     localStorage.setItem('gp_lang', 'fr');

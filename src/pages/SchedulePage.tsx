@@ -1,10 +1,10 @@
 // src/pages/SchedulePage.tsx
-// Services: the posted schedules, as a List or a Calendar, for one month at a time. The URL holds
+// Calendar (the Services page): the posted schedules, as a Calendar or a List, for one month at a time. The URL holds
 // the selection, so a view can be shared or bookmarked:
-//   /services                          all parishes, current month, list
+//   /services                          all parishes, current month, calendar
 //   ?group=<slug>  /  ?parish=<slug>   a named group of parishes / a single parish
 //   ?month=2026-12                     the month (default: this month, New Zealand time)
-//   ?view=calendar                     the calendar grid (default: list)
+//   ?view=list                         the list (default: the calendar grid; ?view=calendar still works)
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -45,7 +45,7 @@ export default function SchedulePage() {
 
   const groupSlug = params.get('group');
   const parishSlug = params.get('parish');
-  const view = params.get('view') === 'calendar' ? 'calendar' : 'list';
+  const view = params.get('view') === 'list' ? 'list' : 'calendar';
   const today = useMemo(() => todayNZ(), []);
   const monthParam = params.get('month');
   const ym = isMonth(monthParam) ? monthParam : monthOf(today);
@@ -133,11 +133,11 @@ export default function SchedulePage() {
           )}
           {canEdit && <Link className="svc-btn" to={`/admin/schedule?month=${ym}${editParish}`}>{t('editSchedule', lang)}</Link>}
           <div className="svc-views" role="group">
-            {(['list', 'calendar'] as const).map(v => (
+            {(['calendar', 'list'] as const).map(v => (
               <button
                 key={v} type="button" aria-pressed={view === v}
                 className={view === v ? 'svc-views__on' : undefined}
-                onClick={() => update({ view: v === 'list' ? null : v })}
+                onClick={() => update({ view: v === 'calendar' ? null : v })}
               >
                 {t(v === 'list' ? 'viewList' : 'viewCalendar', lang)}
               </button>

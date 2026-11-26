@@ -26,7 +26,7 @@ describe('UI strings', () => {
     });
   });
   it('has exactly the three agreed menu items', () => {
-    expect(t('navServices', 'en')).toBe('Services');
+    expect(t('navServices', 'en')).toBe('Calendar');
     expect(t('navParishes', 'en')).toBe('Parishes');
     expect(t('navAbout', 'en')).toBe('About');
   });

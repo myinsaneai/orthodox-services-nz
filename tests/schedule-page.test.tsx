@@ -36,7 +36,7 @@ const day = (parishId: string, date: string, entriesEn: string, entriesEl = '') 
 
 const seen = { url: '' };
 function Where() { const l = useLocation(); seen.url = l.pathname + l.search; return null; }
-const mount = (path = '/services?month=2026-11') => render(
+const mount = (path = '/services?month=2026-11&view=list') => render(
   <MemoryRouter initialEntries={[path]}><LangProvider><SchedulePage /><Where /></LangProvider></MemoryRouter>,
 );
 const cells = (c: HTMLElement) => c.querySelectorAll<HTMLElement>('.svc-cell[data-date]');
@@ -74,17 +74,17 @@ describe('month', () => {
   it('defaults to the current month on a New Zealand clock', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-30T20:00:00Z'));   // already 1 December in NZ (UTC+13)
-    mount('/services');
+    mount('/services?view=list');
     expect(screen.getByRole('heading', { name: 'December 2026' })).toBeTruthy();
     expect(h.months).toEqual(['2026-12']);
   });
   it('uses ?month= and ignores a malformed one', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-24T00:00:00Z'));
-    mount('/services?month=2027-02');
+    mount('/services?month=2027-02&view=list');
     expect(screen.getByRole('heading', { name: 'February 2027' })).toBeTruthy();
     cleanup();
-    mount('/services?month=garbage');
+    mount('/services?month=garbage&view=list');
     expect(screen.getByRole('heading', { name: 'November 2026' })).toBeTruthy();
   });
   it('moves between months, keeps the URL in step and can return to this month', () => {
@@ -106,16 +106,16 @@ describe('month', () => {
     expect(screen.getByRole('heading', { name: 'November 2026' })).toBeTruthy();
   });
   it('goes across the year end', () => {
-    mount('/services?month=2026-12');
+    mount('/services?month=2026-12&view=list');
     fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
     expect(screen.getByRole('heading', { name: 'January 2027' })).toBeTruthy();
   });
 });
 
 describe('List view', () => {
-  it('is the default, headed by the month, with the page heading in the hero band', () => {
+  it('is headed by the month, with the page heading in the hero band', () => {
     const { container } = mount();
-    expect(container.querySelector('.hero h1')?.textContent).toBe('Services');
+    expect(container.querySelector('.hero h1')?.textContent).toBe('Calendar');
     expect(screen.getByText('Service Schedule for November 2026')).toBeTruthy();
     expect(container.querySelector('.svc-table')).toBeTruthy();
   });
@@ -137,7 +137,7 @@ describe('List view', () => {
     expect(screen.queryByText('Closed Parish')).toBeNull();
   });
   it('shows the feast, any NZ holiday and the fast beside the date', () => {
-    const { container } = mount('/services?month=2026-12');
+    const { container } = mount('/services?month=2026-12&view=list');
     const xmasEve = container.querySelector('tr[data-date="2026-12-06"]') as HTMLElement;
     expect(within(xmasEve).getByText('St Nicholas, Archbishop of Myra')).toBeTruthy();
     expect(within(xmasEve).getByText('Fish allowed')).toBeTruthy();       // Nativity Fast, fish allowed on St Nicholas
@@ -167,7 +167,7 @@ describe('List view', () => {
   });
   it('waits for the parish list before showing anything', () => {
     h.deferParishes = true;
-    mount('/services?month=2026-11&parish=holy-trinity');
+    mount('/services?month=2026-11&parish=holy-trinity&view=list');
     expect(screen.getByText('Loading…')).toBeTruthy();
     expect(screen.queryByText(/No service schedule/)).toBeNull();
     act(() => h.parishCb!(h.parishes));
@@ -177,13 +177,13 @@ describe('List view', () => {
 
 describe('scopes', () => {
   it('a group shows only its parishes', () => {
-    const { container } = mount('/services?month=2026-11&group=wellington');
+    const { container } = mount('/services?month=2026-11&group=wellington&view=list');
     const parishes = [...container.querySelectorAll('.svc-block__parish')].map(e => e.textContent);
     expect(parishes).toEqual(['Holy Trinity, Wellington', 'St Andrew, Lower Hutt']);
     expect(screen.queryByText(/Great Vespers/)).toBeNull();               // Auckland
   });
   it('a single parish shows no parish headings', () => {
-    const { container } = mount('/services?month=2026-11&parish=st-nectarios');
+    const { container } = mount('/services?month=2026-11&parish=st-nectarios&view=list');
     expect(screen.getByText(/Great Vespers/)).toBeTruthy();
     expect(container.querySelector('.svc-block__parish')).toBeNull();
     expect(screen.queryByText(/Orthros/)).toBeNull();
@@ -202,10 +202,10 @@ describe('scopes', () => {
     expect(seen.url).toBe('/services?month=2026-11&view=calendar');
   });
   it('an unknown group or hidden parish shows nothing rather than everything', () => {
-    mount('/services?month=2026-11&group=nope');
+    mount('/services?month=2026-11&group=nope&view=list');
     expect(screen.getByText('No service schedule has been posted for this month yet.')).toBeTruthy();
     cleanup();
-    mount('/services?month=2026-11&parish=closed');
+    mount('/services?month=2026-11&parish=closed&view=list');
     expect(screen.getByText('No service schedule has been posted for this month yet.')).toBeTruthy();
   });
 });
@@ -213,15 +213,39 @@ describe('scopes', () => {
 describe('Calendar view', () => {
   const open = (path = '/services?month=2026-11&view=calendar') => mount(path);
 
-  it('the toggle switches views and is kept in the URL', () => {
-    const { container } = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Calendar' }));
-    expect(seen.url).toBe('/services?month=2026-11&view=calendar');
+  it('is the default view, and the page is called Calendar', () => {
+    const { container } = mount('/services?month=2026-11');
+    expect(container.querySelector('.hero h1')?.textContent).toBe('Calendar');
     expect(container.querySelector('.svc-cal')).toBeTruthy();
+    expect(container.querySelector('.svc-table')).toBeNull();
     expect(screen.getByRole('button', { name: 'Calendar' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'List' }).getAttribute('aria-pressed')).toBe('false');
+  });
+  it('an unknown view falls back to the calendar; the old ?view=calendar links still work', () => {
+    for (const v of ['view=calendar', 'view=nonsense', 'view=']) {
+      const { container } = mount(`/services?month=2026-11&${v}`);
+      expect(container.querySelector('.svc-cal')).toBeTruthy();
+      cleanup();
+    }
+  });
+  it('the toggle switches views and is kept in the URL (only the list is named)', () => {
+    const { container } = mount('/services?month=2026-11');
     fireEvent.click(screen.getByRole('button', { name: 'List' }));
-    expect(seen.url).toBe('/services?month=2026-11');
+    expect(seen.url).toBe('/services?month=2026-11&view=list');
     expect(container.querySelector('.svc-table')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'List' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Calendar' }));
+    expect(seen.url).toBe('/services?month=2026-11');
+    expect(container.querySelector('.svc-cal')).toBeTruthy();
+  });
+  it('keeps the chosen view when the month or the parish changes', () => {
+    mount('/services?month=2026-11&view=list');
+    fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+    expect(seen.url).toBe('/services?month=2026-12&view=list');
+  });
+  it('the buttons are in the order Calendar, List', () => {
+    mount('/services?month=2026-11');
+    expect([...document.querySelectorAll('.svc-views button')].map(b => b.textContent)).toEqual(['Calendar', 'List']);
   });
   it('draws a Monday-first grid with every day of the month', () => {
     const { container } = open();
@@ -343,7 +367,7 @@ describe('Greek', () => {
   beforeEach(() => localStorage.setItem('gp_lang', 'el'));
   it('shows Greek headings, month, parish names, group chips and the Greek schedule text', () => {
     const { container } = mount();
-    expect(screen.getByRole('heading', { name: 'Ακολουθίες' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Ημερολόγιο' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Νοέμβριος 2026' })).toBeTruthy();
     expect(screen.getByText('Πρόγραμμα ακολουθιών — Νοέμβριος 2026')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Ομάδα Γουέλλινγκτον' })).toBeTruthy();

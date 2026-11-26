@@ -104,7 +104,7 @@ export default function ScheduleEditorPage() {
                   <option key={p.id} value={p.slug}>{p.nameEn}{p.visible ? '' : ' (hidden)'}</option>
                 ))}
               </select>
-              <Link className="um-btn" to={`/services?month=${ym}&view=calendar&parish=${parish.slug}`}>View public page</Link>
+              <Link className="um-btn" to={`/services?month=${ym}&parish=${parish.slug}`}>View public page</Link>
               {isAtLeast(role, 'admin') && <Link className="um-btn" to="/admin/templates">Templates &amp; quick entries</Link>}
             </div>
 

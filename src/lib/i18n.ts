@@ -7,10 +7,10 @@ import type { Lang } from '../contexts/LangContext';
 const strings = {
   siteTitle:       { en: 'Holy Metropolis of New Zealand (Fiji, Tonga & Samoa)', el: 'Ιερά Μητρόπολις Νέας Ζηλανδίας (Φίτζι, Τόνγκα και Σαμόα)' },
   siteSubtitle:    { en: 'Sacred Services', el: 'Ιερές Ακολουθίες' },
-  navServices:     { en: 'Services', el: 'Ακολουθίες' },
+  navServices:     { en: 'Calendar', el: 'Ημερολόγιο' },     // the first menu item (the page at /services)
   navParishes:     { en: 'Parishes', el: 'Ενορίες' },
   navAbout:        { en: 'About', el: 'Σχετικά' },
-  servicesHeading: { en: 'Services', el: 'Ακολουθίες' },
+  servicesHeading: { en: 'Calendar', el: 'Ημερολόγιο' },
   servicesSub:     { en: 'Service schedules, feasts and fasting days — for all parishes, or choose one', el: 'Προγράμματα ακολουθιών, εορτές και νηστείες — για όλες τις ενορίες ή επιλέξτε μία' },
   allParishes:     { en: 'All parishes', el: 'Όλες οι ενορίες' },
   viewList:        { en: 'List', el: 'Λίστα' },

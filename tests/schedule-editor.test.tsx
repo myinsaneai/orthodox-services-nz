@@ -142,7 +142,7 @@ describe('who and what', () => {
   it('links to the public page for the same parish and month', () => {
     mount();
     expect(screen.getByRole('link', { name: 'View public page' }).getAttribute('href'))
-      .toBe('/services?month=2026-11&view=calendar&parish=ht');
+      .toBe('/services?month=2026-11&parish=ht');
   });
 });
 

@@ -63,14 +63,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('public routes', () => {
-  it('/ goes to Services', async () => {
+  it('/ goes to the Calendar', async () => {
     mountApp('/');
-    expect(await screen.findByRole('heading', { name: 'Services', level: 1 })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Calendar', level: 1 })).toBeTruthy();
     expect(window.location.pathname).toBe('/services');
   });
-  it('an unknown address goes to Services too', async () => {
+  it('an unknown address goes to the Calendar too', async () => {
     mountApp('/no/such/page');
-    expect(await screen.findByRole('heading', { name: 'Services', level: 1 })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Calendar', level: 1 })).toBeTruthy();
   });
   it('Parishes and About open from the menu', async () => {
     mountApp('/services');
@@ -82,7 +82,7 @@ describe('public routes', () => {
   });
   it('public pages never load the admin area', async () => {
     mountApp('/services');
-    await screen.findByRole('heading', { name: 'Services', level: 1 });
+    await screen.findByRole('heading', { name: 'Calendar', level: 1 });
     expect(h.cb).toBeNull();            // the auth listener only starts inside /admin
   });
 });
@@ -105,7 +105,7 @@ describe('admin area (My page)', () => {
     for (const role of ['user', 'coordinator', 'admin', 'superadmin']) {
       cleanup(); h.cb = null;
       await open('/admin/login', role);
-      expect(await screen.findByRole('heading', { name: 'Services', level: 1 })).toBeTruthy();
+      expect(await screen.findByRole('heading', { name: 'Calendar', level: 1 })).toBeTruthy();
       expect(window.location.pathname).toBe('/services');
       expect(screen.queryByRole('heading', { name: 'My page' })).toBeNull();
     }

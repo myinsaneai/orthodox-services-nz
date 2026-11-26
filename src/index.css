@@ -379,3 +379,10 @@ a { color: inherit; }
 .ed-list__text small { display: block; color: var(--color-muted); }
 .ed-form { margin: 0 0 14px; padding: 14px; background: var(--color-cream); border: 1px solid var(--color-card-border); border-radius: 6px; }
 .ed h2.ed-h { font-size: 18px; margin: 24px 0 8px; }
+
+/* The example text in the schedule boxes (editor and templates) is very pale, so it cannot be mistaken for
+   what has been typed. Other greyed text on the site is unchanged. */
+.ed-day textarea::placeholder, .ed-form textarea::placeholder, .ed-form input::placeholder {
+  color: #c9c9c9;
+  opacity: 1;                                  /* Firefox lowers the opacity of placeholders by default */
+}

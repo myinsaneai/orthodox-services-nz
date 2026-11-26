@@ -74,3 +74,17 @@ describe('large screens (min-width 900px)', () => {
     expect(rule(css, '.cards-grid')).toMatch(/repeat\(auto-fill,\s*minmax\(/);
   });
 });
+
+describe('placeholder text in the schedule boxes', () => {
+  const block = css.slice(css.indexOf('.ed-day textarea::placeholder'));
+  const body = block.slice(block.indexOf('{') + 1, block.indexOf('}'));
+  it('is very pale grey, and fully opaque so Firefox does not change it', () => {
+    expect(body).toMatch(/color:\s*#c[0-9a-f]c[0-9a-f]c[0-9a-f]/i);
+    expect(body).toMatch(/opacity:\s*1/);
+  });
+  it('applies only to the editor and template boxes; no other placeholder or input colour is changed', () => {
+    const selectors = block.slice(0, block.indexOf('{')).split(',').map(x => x.trim());
+    expect(selectors).toEqual(['.ed-day textarea::placeholder', '.ed-form textarea::placeholder', '.ed-form input::placeholder']);
+    expect(css.match(/::placeholder/g)).toHaveLength(3);
+  });
+});
