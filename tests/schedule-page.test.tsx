@@ -238,6 +238,18 @@ describe('Calendar view', () => {
     expect(seen.url).toBe('/services?month=2026-11');
     expect(container.querySelector('.svc-cal')).toBeTruthy();
   });
+  it('a parish opened from the Parishes page shows its list, and the Calendar is one click away (parish kept)', () => {
+    const { container } = mount('/services?parish=holy-trinity&view=list');
+    expect(container.querySelector('.svc-table')).toBeTruthy();
+    expect(container.querySelector('.svc-cal')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Calendar' }));
+    expect(container.querySelector('.svc-cal')).toBeTruthy();
+    expect(new URLSearchParams(seen.url.split('?')[1]).get('parish')).toBe('holy-trinity');
+    expect(seen.url).not.toContain('view=');
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+    expect(container.querySelector('.svc-table')).toBeTruthy();
+    expect(new URLSearchParams(seen.url.split('?')[1]).get('parish')).toBe('holy-trinity');
+  });
   it('keeps the chosen view when the month or the parish changes', () => {
     mount('/services?month=2026-11&view=list');
     fireEvent.click(screen.getByRole('button', { name: 'Next month' }));

@@ -65,7 +65,7 @@ export default function ParishesPage() {
           aria-label={`${t(fav ? 'removeFavourite' : 'addFavourite', lang)}: ${name}`}
           onClick={() => setFavourite(p.id, !fav)}
         >{fav ? '★' : '☆'}</button>
-        <Link to={`/services?parish=${encodeURIComponent(p.slug)}`} style={{ display: 'block', textDecoration: 'none' }}>
+        <Link to={`/services?parish=${encodeURIComponent(p.slug)}&view=list`} style={{ display: 'block', textDecoration: 'none' }}>
           {safePhotoUrl(p.photoURL) && <img className="pc-photo" src={safePhotoUrl(p.photoURL)} alt="" loading="lazy" />}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 34 }}>
             <span style={{

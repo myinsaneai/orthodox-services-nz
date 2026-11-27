@@ -37,10 +37,10 @@ describe('Parishes page', () => {
     expect(screen.getByText('Auckland')).toBeTruthy();       // no address: just the city
     expect(screen.queryByText('Hidden')).toBeNull();
   });
-  it('each parish links to its own schedule, with the slug safely encoded', () => {
+  it('each parish links to its own schedule as a list, with the slug safely encoded', () => {
     mount();
-    expect(screen.getByRole('link', { name: /Holy Trinity/ }).getAttribute('href')).toBe('/services?parish=holy-trinity');
-    expect(screen.getByRole('link', { name: /St Nectarios/ }).getAttribute('href')).toBe('/services?parish=st%20nect%261');
+    expect(screen.getByRole('link', { name: /Holy Trinity/ }).getAttribute('href')).toBe('/services?parish=holy-trinity&view=list');
+    expect(screen.getByRole('link', { name: /St Nectarios/ }).getAttribute('href')).toBe('/services?parish=st%20nect%261&view=list');
   });
   it('uses the hero and full-width card grid classes', () => {
     const { container } = mount();
@@ -98,7 +98,7 @@ describe('Parishes page', () => {
     it('the card has one schedule link (the map link is separate, not nested)', () => {
       h.parishes = full();
       mount();
-      expect(screen.getByRole('link', { name: /St John/ }).getAttribute('href')).toBe('/services?parish=st-john');
+      expect(screen.getByRole('link', { name: /St John/ }).getAttribute('href')).toBe('/services?parish=st-john&view=list');
       expect(screen.getByRole('link', { name: /St John/ }).querySelector('a')).toBeNull();
     });
   });
@@ -281,7 +281,7 @@ describe('favourites', () => {
   it('the star does not open the parish, and the card link still goes to its schedule', () => {
     mount();
     expect(star('Auckland').closest('a')).toBeNull();
-    expect(screen.getByRole('link', { name: /Auckland/ }).getAttribute('href')).toBe('/services?parish=n1');
+    expect(screen.getByRole('link', { name: /Auckland/ }).getAttribute('href')).toBe('/services?parish=n1&view=list');
   });
   it('is the same for signed-in people: it needs no role', () => {
     h.role = 'user';
