@@ -213,3 +213,107 @@ describe('grouped by state', () => {
     });
   });
 });
+
+describe('favourites', () => {
+  const p = (id: string, nameEn: string, state: string, order: number, over: any = {}) =>
+    ({ id, slug: id, nameEn, nameEl: nameEn + '-el', city: nameEn + ' city', cityEl: nameEn + ' πόλη', address: '', state, groupIds: [], accentColor: '', order, visible: true, ...over });
+  beforeEach(() => {
+    h.parishes = [
+      p('n1', 'Auckland', 'nz', 1), p('n2', 'Wellington', 'nz', 2), p('n3', 'Christchurch', 'nz', 3),
+      p('f1', 'Suva', 'fj', 4), p('t1', 'Nuku', 'to', 5), p('hid', 'Hidden', 'nz', 6, { visible: false }),
+    ];
+  });
+  const headings = () => screen.getAllByRole('heading', { level: 2 }).map(x => x.textContent);
+  const cardNames = (heading: string) => {
+    const sec = screen.getByRole('heading', { name: heading }).closest('section') as HTMLElement;
+    return [...sec.querySelectorAll('.cards-grid > div')].map(c => c.querySelector('span[style*="font-weight"]')?.textContent);
+  };
+  const star = (name: string) => screen.getByLabelText(new RegExp(`favourites: ${name}$`)) as HTMLButtonElement;
+
+  it('a new visitor sees a hint, every card has an empty star, and no Favourites section', () => {
+    mount();
+    expect(headings()).toEqual(['New Zealand', 'Fiji', 'Tonga']);
+    expect(screen.getByText(/Tap the star on a parish/)).toBeTruthy();
+    expect(star('Auckland').getAttribute('aria-pressed')).toBe('false');
+    expect(star('Auckland').textContent).toBe('☆');
+    expect(screen.queryByLabelText(/favourites: Hidden/)).toBeNull();
+  });
+  it('starring a parish moves it into a Favourites section at the top, and takes it out of its state', () => {
+    mount();
+    fireEvent.click(star('Wellington'));
+    expect(headings()).toEqual(['★ Favourites', 'New Zealand', 'Fiji', 'Tonga']);
+    expect(cardNames('★ Favourites')).toEqual(['Wellington']);
+    expect(cardNames('New Zealand')).toEqual(['Auckland', 'Christchurch']);
+    expect(screen.queryByText(/Tap the star on a parish/)).toBeNull();
+    expect(JSON.parse(localStorage.getItem('gp_fav_parishes')!)).toEqual(['n2']);
+    expect(star('Wellington').getAttribute('aria-pressed')).toBe('true');
+    expect(star('Wellington').textContent).toBe('★');
+  });
+  it('favourites from several states are ordered by state, then the usual order, and name their state', () => {
+    mount();
+    fireEvent.click(star('Nuku')); fireEvent.click(star('Suva')); fireEvent.click(star('Christchurch')); fireEvent.click(star('Auckland'));
+    expect(cardNames('★ Favourites')).toEqual(['Auckland', 'Christchurch', 'Suva', 'Nuku']);
+    const sec = screen.getByRole('heading', { name: '★ Favourites' }).closest('section') as HTMLElement;
+    expect(sec.textContent).toContain('Suva city · Fiji');
+    expect(sec.textContent).toContain('Auckland city · New Zealand');
+    expect(headings()).toEqual(['★ Favourites', 'New Zealand']);        // Fiji and Tonga are now empty and disappear
+    expect(cardNames('New Zealand')).toEqual(['Wellington']);
+  });
+  it('un-starring puts the parish back in its state, in its usual place', () => {
+    mount();
+    fireEvent.click(star('Wellington'));
+    fireEvent.click(star('Wellington'));
+    expect(headings()).toEqual(['New Zealand', 'Fiji', 'Tonga']);
+    expect(cardNames('New Zealand')).toEqual(['Auckland', 'Wellington', 'Christchurch']);
+    expect(localStorage.getItem('gp_fav_parishes')).toBeNull();
+  });
+  it('remembers favourites after a reload, and ignores ones that no longer exist or are hidden', () => {
+    localStorage.setItem('gp_fav_parishes', JSON.stringify(['f1', 'gone', 'hid']));
+    mount();
+    expect(headings()).toEqual(['★ Favourites', 'New Zealand', 'Tonga']);
+    expect(cardNames('★ Favourites')).toEqual(['Suva']);
+  });
+  it('a change made in another tab shows up here', () => {
+    mount();
+    act(() => { localStorage.setItem('gp_fav_parishes', JSON.stringify(['t1'])); window.dispatchEvent(new StorageEvent('storage', { key: 'gp_fav_parishes' })); });
+    expect(cardNames('★ Favourites')).toEqual(['Nuku']);
+  });
+  it('the star does not open the parish, and the card link still goes to its schedule', () => {
+    mount();
+    expect(star('Auckland').closest('a')).toBeNull();
+    expect(screen.getByRole('link', { name: /Auckland/ }).getAttribute('href')).toBe('/services?parish=n1');
+  });
+  it('is the same for signed-in people: it needs no role', () => {
+    h.role = 'user';
+    mount();
+    fireEvent.click(star('Suva'));
+    expect(cardNames('★ Favourites')).toEqual(['Suva']);
+  });
+  it('is in Greek in Greek', () => {
+    localStorage.setItem('gp_lang', 'el');
+    localStorage.setItem('gp_fav_parishes', JSON.stringify(['n1']));
+    mount();
+    expect(headings()[0]).toBe('★ Αγαπημένες');
+    expect(screen.getByLabelText('Αφαίρεση από τα αγαπημένα: Auckland-el')).toBeTruthy();
+    expect(screen.getByLabelText('Προσθήκη στα αγαπημένα: Wellington-el')).toBeTruthy();
+  });
+  it('admins: no move buttons on favourites (that list mixes states), still on the rest, and Edit stays', async () => {
+    h.role = 'admin';
+    localStorage.setItem('gp_fav_parishes', JSON.stringify(['n2']));
+    mount();
+    expect(screen.queryByLabelText('Move up: Wellington')).toBeNull();
+    expect(screen.getByLabelText('Move down: Auckland')).toBeTruthy();
+    expect(screen.getByLabelText('Move up: Christchurch')).toBeTruthy();
+    const fav = screen.getByRole('heading', { name: '★ Favourites' }).closest('section') as HTMLElement;
+    expect(fav.querySelector('a.pc-edit')).toBeTruthy();
+    // moving works among the parishes shown in the state: Auckland and Christchurch swap places
+    await act(async () => { fireEvent.click(screen.getByLabelText('Move down: Auckland')); });
+    expect(h.writes).toEqual([[{ id: 'n3', order: 1 }, { id: 'n1', order: 3 }]]);
+  });
+  it('shows no hint when there are no parishes at all', () => {
+    h.parishes = [];
+    mount();
+    expect(screen.queryByText(/Tap the star/)).toBeNull();
+  });
+});
+

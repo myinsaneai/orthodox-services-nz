@@ -1,6 +1,6 @@
 // src/components/SiteLayout.tsx
 // Public shell — Option A "Cathedral Classic": maroon header with the two
-// seals flanking the site title, nav row (Services / Parishes / About + language).
+// seals flanking the site title, nav row (Parishes / Calendar / About + language).
 
 import React, { useState } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
@@ -16,8 +16,8 @@ import sealLeft from '../assets/seals/seal-left-ecumenical-patriarchate.png';
 import sealRight from '../assets/seals/seal-right-holy-metropolis-nz.png';
 
 const NAV: { to: string; key: StringKey }[] = [
-  { to: '/services', key: 'navServices' },
   { to: '/parishes', key: 'navParishes' },
+  { to: '/services', key: 'navServices' },
   { to: '/about',    key: 'navAbout' },
 ];
 
@@ -32,7 +32,7 @@ const MY_PAGE_SECTIONS: { to: string; key: StringKey; min: RoleName }[] = [
 ];
 
 // Log in / Log out sits next to the menu, outside the <nav>, so the menu stays
-// exactly Services, Parishes, About + language. It shows "Log out" from a
+// exactly Parishes, Calendar, About + language. It shows "Log out" from a
 // stored hint written by the admin area; Firebase Auth itself is loaded only
 // when "Log out" is clicked, never for ordinary visitors.
 function AccountControl() {

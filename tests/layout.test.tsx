@@ -31,12 +31,12 @@ describe('header', () => {
     const order = [...header.querySelectorAll('img, div')].map(e => e.tagName === 'IMG' ? (e as HTMLImageElement).alt : '');
     expect(order.indexOf('Ecumenical Patriarchate')).toBeLessThan(order.indexOf('Holy Metropolis of New Zealand'));
   });
-  it('has exactly Calendar, Parishes, About and the language switch', () => {
+  it('has exactly Parishes, Calendar, About and the language switch, in that order', () => {
     mount();
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     const links = within(nav).getAllByRole('link');
-    expect(links.map(a => a.textContent)).toEqual(['Calendar', 'Parishes', 'About']);
-    expect(links.map(a => a.getAttribute('href'))).toEqual(['/services', '/parishes', '/about']);
+    expect(links.map(a => a.textContent)).toEqual(['Parishes', 'Calendar', 'About']);
+    expect(links.map(a => a.getAttribute('href'))).toEqual(['/parishes', '/services', '/about']);
     expect(within(nav).getAllByRole('button')).toHaveLength(1);
   });
   it('underlines the current page', () => {

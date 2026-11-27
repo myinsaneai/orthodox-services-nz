@@ -63,19 +63,22 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('public routes', () => {
-  it('/ goes to the Calendar', async () => {
+  it('/ goes to Parishes, the first page', async () => {
     mountApp('/');
+    expect(await screen.findByRole('heading', { name: 'Parishes', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/parishes');
+  });
+  it('an unknown address goes to Parishes too', async () => {
+    mountApp('/no/such/page');
+    expect(await screen.findByRole('heading', { name: 'Parishes', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/parishes');
+  });
+  it('Calendar and About open from the menu; the Calendar is the second item', async () => {
+    mountApp('/');
+    await screen.findByRole('heading', { name: 'Parishes', level: 1 });
+    fireEvent.click(screen.getByRole('link', { name: 'Calendar' }));
     expect(await screen.findByRole('heading', { name: 'Calendar', level: 1 })).toBeTruthy();
     expect(window.location.pathname).toBe('/services');
-  });
-  it('an unknown address goes to the Calendar too', async () => {
-    mountApp('/no/such/page');
-    expect(await screen.findByRole('heading', { name: 'Calendar', level: 1 })).toBeTruthy();
-  });
-  it('Parishes and About open from the menu', async () => {
-    mountApp('/services');
-    fireEvent.click(screen.getByRole('link', { name: 'Parishes' }));
-    expect(await screen.findByRole('heading', { name: 'Parishes' })).toBeTruthy();
     fireEvent.click(screen.getByRole('link', { name: 'About' }));
     expect(await screen.findByRole('heading', { name: 'About' })).toBeTruthy();
     expect(window.location.pathname).toBe('/about');
@@ -105,8 +108,8 @@ describe('admin area (My page)', () => {
     for (const role of ['user', 'coordinator', 'admin', 'superadmin']) {
       cleanup(); h.cb = null;
       await open('/admin/login', role);
-      expect(await screen.findByRole('heading', { name: 'Calendar', level: 1 })).toBeTruthy();
-      expect(window.location.pathname).toBe('/services');
+      expect(await screen.findByRole('heading', { name: 'Parishes', level: 1 })).toBeTruthy();
+      expect(window.location.pathname).toBe('/parishes');
       expect(screen.queryByRole('heading', { name: 'My page' })).toBeNull();
     }
   });

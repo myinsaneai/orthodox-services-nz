@@ -22,7 +22,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* ── Public site ── */}
-          <Route path="/" element={<Navigate to="/services" replace />} />
+          <Route path="/" element={<Navigate to="/parishes" replace />} />
           <Route path="/services" element={<SiteLayout><SchedulePage /></SiteLayout>} />
           <Route path="/parishes" element={<SiteLayout><ParishesPage /></SiteLayout>} />
           <Route path="/about"    element={<SiteLayout><AboutPage /></SiteLayout>} />
