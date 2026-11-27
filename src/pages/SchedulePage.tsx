@@ -39,7 +39,6 @@ export default function SchedulePage() {
   // Until the parish list has arrived, a ?parish= / ?group= slug cannot be resolved.
   const [parishesLoaded, setParishesLoaded] = useState(false);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [showAll, setShowAll] = useState(false);
   // A hint only: it decides whether to show the Edit links. The editor page and the rules do the real check.
   const canEdit = isAtLeast(useRoleHint(), 'coordinator');
 
@@ -150,10 +149,7 @@ export default function SchedulePage() {
         ) : loaded?.error ? (
           <p role="alert" className="svc-error">{t('scheduleLoadFailed', lang)}</p>
         ) : view === 'list' ? (
-          <ServiceList
-            key={ym} ym={ym} lang={lang} entries={entries} multi={multi}
-            showAll={showAll} onToggleShowAll={() => setShowAll(s => !s)}
-          />
+          <ServiceList key={ym} ym={ym} lang={lang} entries={entries} multi={multi} />
         ) : (
           <ServiceCalendar
             key={ym} ym={ym} lang={lang} entries={entries} multi={multi} today={today}

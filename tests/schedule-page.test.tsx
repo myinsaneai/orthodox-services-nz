@@ -143,22 +143,19 @@ describe('List view', () => {
     expect(within(xmasEve).getByText('Fish allowed')).toBeTruthy();       // Nativity Fast, fish allowed on St Nicholas
     expect(xmasEve.querySelector('svg[data-fast="fish"]')).toBeTruthy();
   });
-  it('says so when the month has no schedule, and offers every day', () => {
+  it('says so when the month has no schedule, with no Copy button and no empty day rows', () => {
     h.days = [];
     const { container } = mount();
     expect(screen.getByText('No service schedule has been posted for this month yet.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Show all days' }));
-    expect(container.querySelectorAll('.svc-table tbody tr')).toHaveLength(30);
-    expect(screen.getByText('St Catherine the Great Martyr')).toBeTruthy();
+    expect(container.querySelectorAll('.svc-table')).toHaveLength(0);
   });
-  it('can show all days and go back to posted days only', () => {
+  it('lists only the days that have a posted schedule, and has no "show all days" control', () => {
     const { container } = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Show all days' }));
-    expect(container.querySelectorAll('.svc-table tbody tr')).toHaveLength(30);
-    expect(container.querySelectorAll('.svc-none').length).toBe(28);
-    fireEvent.click(screen.getByRole('button', { name: 'Show only days with services' }));
     expect(container.querySelectorAll('.svc-table tbody tr')).toHaveLength(2);
+    expect(container.querySelectorAll('.svc-table .svc-none')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Show all days|Show only days/ })).toBeNull();
+    expect(screen.queryByText(/Show all days/)).toBeNull();
   });
   it('shows a load error instead of an empty month', () => {
     h.failDays = true;

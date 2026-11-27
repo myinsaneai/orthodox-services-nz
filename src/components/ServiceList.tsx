@@ -1,7 +1,7 @@
 // src/components/ServiceList.tsx
 // The List view: one row per day with the date, the feast and the fast on the left and what the
 // parishes have posted on the right — and a Copy button that puts the table on the clipboard so it
-// pastes into Word. By default only days with a posted schedule are listed.
+// pastes into Word. Only days with a posted schedule are listed.
 
 import { useEffect, useRef, useState } from 'react';
 import type { Lang } from '../contexts/LangContext';
@@ -33,15 +33,11 @@ interface Props {
   entries: Record<string, ParishEntry[]>;      // by date
   /** More than one parish may appear, so each block is headed by the parish name. */
   multi: boolean;
-  showAll: boolean;
-  onToggleShowAll: () => void;
 }
 
-export default function ServiceList({ ym, lang, entries, multi, showAll, onToggleShowAll }: Props) {
+export default function ServiceList({ ym, lang, entries, multi }: Props) {
   const [y, m] = ym.split('-').map(Number);
-  const allDates = Array.from({ length: daysInMonth(y, m) }, (_, i) => toISO(y, m, i + 1));
-  const postedDates = allDates.filter(d => entries[d]?.length);
-  const dates = showAll ? allDates : postedDates;
+  const dates = Array.from({ length: daysInMonth(y, m) }, (_, i) => toISO(y, m, i + 1)).filter(d => entries[d]?.length);
   const title = `${t('scheduleTitle', lang)} ${monthTitle(ym, lang)}`;
 
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -54,7 +50,7 @@ export default function ServiceList({ ym, lang, entries, multi, showAll, onToggl
   };
 
   async function copy() {
-    const rows: ExportRow[] = postedDates.map(d => ({
+    const rows: ExportRow[] = dates.map(d => ({
       dateLabel: dayMonth(d, lang),
       dayLabel: weekdayLong(d, lang),
       feast: dayFeastNames(getDayData(d), lang) || undefined,
@@ -80,12 +76,7 @@ export default function ServiceList({ ym, lang, entries, multi, showAll, onToggl
       <div className="svc-list__head">
         <h2 className="svc-list__title">{title}</h2>
         <div className="svc-list__tools">
-          {(postedDates.length > 0 || showAll) && (
-            <button type="button" className="svc-btn" onClick={onToggleShowAll}>
-              {showAll ? t('showPostedDays', lang) : t('showAllDays', lang)}
-            </button>
-          )}
-          {postedDates.length > 0 && (
+          {dates.length > 0 && (
             <button
               type="button" className={`svc-btn${status === 'copied' ? ' svc-btn--on' : ''}`}
               onClick={copy} title={t('copyTableTitle', lang)}
@@ -100,7 +91,6 @@ export default function ServiceList({ ym, lang, entries, multi, showAll, onToggl
       {dates.length === 0 ? (
         <div className="svc-empty">
           <p>{t('noScheduleMonth', lang)}</p>
-          <button type="button" className="svc-btn" onClick={onToggleShowAll}>{t('showAllDays', lang)}</button>
         </div>
       ) : (
         <table className="svc-table">
@@ -109,7 +99,7 @@ export default function ServiceList({ ym, lang, entries, multi, showAll, onToggl
               const day = getDayData(d);
               const dow = weekday(d);
               const feast = dayFeastNames(day, lang);
-              const posted = entries[d] ?? [];
+              const posted = entries[d];
               return (
                 <tr key={d} data-date={d}>
                   <td className="svc-table__day">
@@ -124,7 +114,7 @@ export default function ServiceList({ ym, lang, entries, multi, showAll, onToggl
                     )}
                   </td>
                   <td className="svc-table__entries">
-                    {posted.length === 0 ? <span className="svc-none">—</span> : posted.map(e => (
+                    {posted.map(e => (
                       <div key={e.parishId} className="svc-block">
                         {multi && <div className="svc-block__parish">{parishName(e, lang)}</div>}
                         <EntryText text={e.text} />

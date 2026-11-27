@@ -25,8 +25,6 @@ const strings = {
   copyFailed:      { en: 'Could not copy to the clipboard.', el: 'Η αντιγραφή στο πρόχειρο απέτυχε.' },
   noScheduleMonth: { en: 'No service schedule has been posted for this month yet.', el: 'Δεν έχει αναρτηθεί ακόμη πρόγραμμα ακολουθιών για αυτόν τον μήνα.' },
   noScheduleDay:   { en: 'No service schedule posted for this day yet.', el: 'Δεν έχει αναρτηθεί ακόμη πρόγραμμα ακολουθιών για αυτήν την ημέρα.' },
-  showAllDays:     { en: 'Show all days', el: 'Εμφάνιση όλων των ημερών' },
-  showPostedDays:  { en: 'Show only days with services', el: 'Μόνο ημέρες με ακολουθίες' },
   scheduleLoadFailed: { en: 'The schedule could not be loaded. Please try again later.', el: 'Το πρόγραμμα δεν ήταν δυνατό να φορτωθεί. Δοκιμάστε ξανά αργότερα.' },
   editSchedule:    { en: 'Edit schedule', el: 'Επεξεργασία προγράμματος' },
   editThisDay:     { en: 'Edit this day', el: 'Επεξεργασία ημέρας' },
